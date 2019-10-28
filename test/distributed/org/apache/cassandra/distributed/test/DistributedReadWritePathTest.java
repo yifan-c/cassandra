@@ -36,12 +36,6 @@ import static org.apache.cassandra.net.OutboundConnections.LARGE_MESSAGE_THRESHO
 
 public class DistributedReadWritePathTest extends DistributedTestBase
 {
-    @BeforeClass
-    public static void before()
-    {
-        DatabaseDescriptor.clientInitialization();
-    }
-
     @Test
     public void coordinatorReadTest() throws Throwable
     {
@@ -138,7 +132,7 @@ public class DistributedReadWritePathTest extends DistributedTestBase
 
             assertRows(cluster.get(3).executeInternal("SELECT * FROM " + KEYSPACE + ".tbl WHERE pk = 1"));
 
-            cluster.verbs(READ_REPAIR_REQ).to(3).drop();
+            cluster.verbs(READ_REPAIR_REQ).to(3).drop().on();
             assertRows(cluster.coordinator(1).execute("SELECT * FROM " + KEYSPACE + ".tbl WHERE pk = 1",
                                                      ConsistencyLevel.QUORUM),
                        row(1, 1, 1));

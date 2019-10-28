@@ -28,7 +28,7 @@ import org.apache.cassandra.net.Verb;
 
 public class MessageFilters implements IMessageFilters
 {
-    private final Set<Filter> filters = new CopyOnWriteArraySet<>();
+    private final Set<IMessageFilters.Filter> filters = new CopyOnWriteArraySet<>();
 
     public boolean permit(IInstance from, IInstance to, int verb)
     {
@@ -37,20 +37,20 @@ public class MessageFilters implements IMessageFilters
         int fromNum = from.config().num();
         int toNum = to.config().num();
 
-        for (Filter filter : filters)
+        for (IMessageFilters.Filter filter : filters)
             if (filter.matches(fromNum, toNum, verb))
-                return false;
+                return filter.apply();
 
         return true;
     }
 
-    public class Filter implements IMessageFilters.Filter
+    protected abstract class FilterBase implements IMessageFilters.Filter
     {
-        final int[] from;
-        final int[] to;
-        final int[] verbs;
+        protected final int[] from;
+        protected final int[] to;
+        protected final int[] verbs;
 
-        Filter(int[] from, int[] to, int[] verbs)
+        FilterBase(int[] from, int[] to, int[] verbs)
         {
             if (from != null)
             {
@@ -72,42 +72,72 @@ public class MessageFilters implements IMessageFilters
             this.verbs = verbs;
         }
 
-        public int hashCode()
-        {
-            return (from == null ? 0 : Arrays.hashCode(from))
-                    + (to == null ? 0 : Arrays.hashCode(to))
-                    + (verbs == null ? 0 : Arrays.hashCode(verbs));
-        }
-
-        public boolean equals(Object that)
-        {
-            return that instanceof Filter && equals((Filter) that);
-        }
-
-        public boolean equals(Filter that)
-        {
-            return Arrays.equals(from, that.from)
-                    && Arrays.equals(to, that.to)
-                    && Arrays.equals(verbs, that.verbs);
-        }
-
         public boolean matches(int from, int to, int verb)
         {
             return (this.from == null || Arrays.binarySearch(this.from, from) >= 0)
-                    && (this.to == null || Arrays.binarySearch(this.to, to) >= 0)
-                    && (this.verbs == null || Arrays.binarySearch(this.verbs, verb) >= 0);
+                   && (this.to == null || Arrays.binarySearch(this.to, to) >= 0)
+                   && (this.verbs == null || Arrays.binarySearch(this.verbs, verb) >= 0);
         }
 
-        public Filter restore()
+        public IMessageFilters.Filter off()
         {
             filters.remove(this);
             return this;
         }
 
-        public Filter drop()
+        public IMessageFilters.Filter on()
         {
             filters.add(this);
             return this;
+        }
+
+        public int hashCode()
+        {
+            return (from == null ? 0 : Arrays.hashCode(from))
+                   + (to == null ? 0 : Arrays.hashCode(to))
+                   + (verbs == null ? 0 : Arrays.hashCode(verbs));
+        }
+
+        public boolean equals(Object that)
+        {
+            return that instanceof FilterBase && equals0((FilterBase) that);
+        }
+
+        boolean equals0(FilterBase that)
+        {
+            return Arrays.equals(from, that.from)
+                   && Arrays.equals(to, that.to)
+                   && Arrays.equals(verbs, that.verbs);
+        }
+    }
+
+    public class DropFilter extends FilterBase
+    {
+        DropFilter(int[] from, int[] to, int[] verbs)
+        {
+            super(from, to, verbs);
+        }
+
+        public boolean apply()
+        {
+            return false;
+        }
+    }
+
+    public class InterceptFilter extends FilterBase
+    {
+        final Runnable runnable;
+
+        InterceptFilter(int[] from, int[] to, int[] verbs, Runnable runnable)
+        {
+            super(from, to, verbs);
+            this.runnable = runnable;
+        }
+
+        public boolean apply()
+        {
+            runnable.run();
+            return true;
         }
     }
 
@@ -134,14 +164,14 @@ public class MessageFilters implements IMessageFilters
             return this;
         }
 
-        public Filter ready()
+        public DropFilter drop()
         {
-            return new Filter(from, to, verbs);
+            return new DropFilter(from, to, verbs);
         }
 
-        public Filter drop()
+        public InterceptFilter intercept(Runnable runnable)
         {
-            return ready().drop();
+            return new InterceptFilter(from, to, verbs, runnable);
         }
     }
 

@@ -18,23 +18,29 @@
 
 package org.apache.cassandra.distributed.api;
 
-import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.Verb;
 
 public interface IMessageFilters
 {
     public interface Filter
     {
-        Filter restore();
-        Filter drop();
+        // deactivate filter
+        Filter off();
+        // activate filter
+        Filter on();
+        boolean apply();
+        // determine if the filter should handle
+        boolean matches(int from, int to, int verb);
     }
 
     public interface Builder
     {
         Builder from(int ... nums);
         Builder to(int ... nums);
-        Filter ready();
+        // build a drop filter
         Filter drop();
+        // build a filter that invokes the runnable before permitting
+        Filter intercept(Runnable runnable);
     }
 
     Builder verbs(Verb ... verbs);
