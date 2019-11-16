@@ -1144,12 +1144,12 @@ Table of Contents
                              - "BATCH_LOG": the timeout occurred during the
                                write to the batch log when a (logged) batch
                                write was requested.
-                            - "CAS": the timeout occured during the Compare And Set write/update.
-                            - "VIEW": the timeout occured when a write involves
-                              VIEW update and failure to acqiure local view(MV)
-                              lock for key within timeout
-                            - "CDC": the timeout occured when cdc_total_space_in_mb is
-                              exceeded when doing a write to data tracked by cdc.
+                             - "CAS": the timeout occured during the Compare And Set write/update.
+                             - "VIEW": the timeout occured when a write involves
+                               VIEW update and failure to acqiure local view(MV)
+                               lock for key within timeout
+                             - "CDC": the timeout occured when cdc_total_space_in_mb is
+                               exceeded when doing a write to data tracked by cdc.
     0x1200    Read_timeout: Timeout exception during a read request. The rest
               of the ERROR message body will be
                 <cl><received><blockfor><data_present>
@@ -1225,12 +1225,24 @@ Table of Contents
                              - "BATCH_LOG": the failure occured during the
                                write to the batch log when a (logged) batch
                                write was requested.
-                            - "CAS": the failure occured during the Compare And Set write/update.
-                            - "VIEW": the failure occured when a write involves
-                              VIEW update and failure to acqiure local view(MV)
-                              lock for key within timeout
-                            - "CDC": the failure occured when cdc_total_space_in_mb is
-                              exceeded when doing a write to data tracked by cdc.
+                             - "CAS": the failure occured during the Compare And Set write/update.
+                             - "VIEW": the failure occured when a write involves
+                               VIEW update and failure to acqiure local view(MV)
+                               lock for key within timeout
+                             - "CDC": the failure occured when cdc_total_space_in_mb is
+                               exceeded when doing a write to data tracked by cdc.
+    0x1600    CDC_WRITE_FAILURE: // todo
+    0x1700    CAS_UNCERTAINTY: An exception during contended Compare And Set write/update. The exception indicates
+              the CAS operation result may or may not be sucessful. Clients receiving the exception can send a
+              read query to confirm. The rest of the ERROR message body will be
+                <cl><received><blockfor>
+              where:
+                <cl> is the [consistency] level of the query having triggered
+                     the exception.
+                <received> is an [int] representing the number of nodes having
+                           acknowledged the request.
+                <blockfor> is an [int] representing the number of replicas whose
+                           acknowledgement is required to achieve <cl>.
 
     0x2000    Syntax_error: The submitted query has a syntax error.
     0x2100    Unauthorized: The logged user doesn't have the right to perform
