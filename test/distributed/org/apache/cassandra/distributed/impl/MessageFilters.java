@@ -100,10 +100,10 @@ public class MessageFilters implements IMessageFilters
 
         public boolean equals(Object that)
         {
-            return that instanceof FilterBase && equals0((FilterBase) that);
+            return that instanceof FilterBase && equals((FilterBase) that);
         }
 
-        boolean equals0(FilterBase that)
+        boolean equals(FilterBase that)
         {
             return Arrays.equals(from, that.from)
                    && Arrays.equals(to, that.to)
