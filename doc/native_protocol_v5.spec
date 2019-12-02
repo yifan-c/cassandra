@@ -1195,7 +1195,7 @@ Table of Contents
                 <arg_types> [string list] one string for each argument type (as CQL type) of the failed function
     0x1500    Write_failure: A non-timeout exception during a write request. The rest
               of the ERROR message body will be
-                <cl><received><blockfor><reasonmap><write_type>
+                <cl><received><blockfor><reasonmap><write_type><contentions>
               where:
                 <cl> is the [consistency] level of the query having triggered
                      the exception.
@@ -1231,10 +1231,12 @@ Table of Contents
                                lock for key within timeout
                              - "CDC": the failure occured when cdc_total_space_in_mb is
                                exceeded when doing a write to data tracked by cdc.
+                <contentions> is a [short] that describes the number of contentions occured during the CAS operation.
+                              The field only presents when the <writeType> is "CAS".
     0x1600    CDC_WRITE_FAILURE: // todo
-    0x1700    CAS_UNCERTAINTY: An exception during contended Compare And Set write/update. The exception indicates
-              the CAS operation result may or may not be sucessful. Clients receiving the exception can send a
-              read query to confirm. The rest of the ERROR message body will be
+    0x1700    CAS_UNCERTAINTY: An exception occured due to contended Compare And Set write/update. The CAS operation
+              was only partially completed and the operation may or may not get completed by a following CAS write or
+              SERIAL/LOCAL_SERIAL read. The rest of the ERROR message body will be
                 <cl><received><blockfor>
               where:
                 <cl> is the [consistency] level of the query having triggered

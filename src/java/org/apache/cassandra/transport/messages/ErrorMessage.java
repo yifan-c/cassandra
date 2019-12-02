@@ -123,7 +123,7 @@ public class ErrorMessage extends Message.Response
                             WriteType writeType = Enum.valueOf(WriteType.class, CBUtil.readString(body));
                             if (writeType == WriteType.CAS)
                             {
-                                int contentions = body.readInt();
+                                int contentions = body.readShort();
                                 te = new CasWriteTimeoutException(writeType, cl, received, blockFor, contentions);
                             }
                             else
@@ -178,7 +178,7 @@ public class ErrorMessage extends Message.Response
                         ConsistencyLevel cl = CBUtil.readConsistencyLevel(body);
                         int received = body.readInt();
                         int blockFor = body.readInt();
-                        te = new CasWriteUncertainException(cl, received, blockFor);
+                        te = new CasWriteStalledException(cl, received, blockFor);
                     }
                     break;
             }
@@ -239,7 +239,7 @@ public class ErrorMessage extends Message.Response
                     {
                         CBUtil.writeAsciiString(((WriteTimeoutException)rte).writeType.toString(), dest);
                         if (rte instanceof CasWriteTimeoutException)
-                            dest.writeInt(((CasWriteTimeoutException)rte).contentions);
+                            dest.writeShort(((CasWriteTimeoutException)rte).contentions);
                     }
                     else
                     {
@@ -262,7 +262,7 @@ public class ErrorMessage extends Message.Response
                     CBUtil.writeAsciiString(aee.cfName, dest);
                     break;
                 case CAS_UNCERTAINTY:
-                    CasWriteUncertainException cwue = (CasWriteUncertainException)err;
+                    CasWriteStalledException cwue = (CasWriteStalledException)err;
                     CBUtil.writeConsistencyLevel(cwue.consistency, dest);
                     dest.writeInt(cwue.received);
                     dest.writeInt(cwue.blockFor);
@@ -304,7 +304,7 @@ public class ErrorMessage extends Message.Response
                     boolean isWrite = err.code() == ExceptionCode.WRITE_TIMEOUT;
                     size += CBUtil.sizeOfConsistencyLevel(rte.consistency) + 8;
                     size += isWrite ? CBUtil.sizeOfAsciiString(((WriteTimeoutException)rte).writeType.toString()) : 1;
-                    size += isWrite && rte instanceof CasWriteTimeoutException ? 4 : 0; // CasWriteTimeoutException appends 1 more int for contentions occured.
+                    size += isWrite && rte instanceof CasWriteTimeoutException ? 2 : 0; // CasWriteTimeoutException appends a short for contentions occured.
                     break;
                 case FUNCTION_FAILURE:
                     FunctionExecutionException fee = (FunctionExecutionException)msg.error;
@@ -322,7 +322,7 @@ public class ErrorMessage extends Message.Response
                     size += CBUtil.sizeOfAsciiString(aee.cfName);
                     break;
                 case CAS_UNCERTAINTY:
-                    CasWriteUncertainException cwue = (CasWriteUncertainException)err;
+                    CasWriteStalledException cwue = (CasWriteStalledException)err;
                     size += CBUtil.sizeOfConsistencyLevel(cwue.consistency) + 4 + 4; // receivedFor: 4, blockFor: 4
                     break;
             }
@@ -360,7 +360,7 @@ public class ErrorMessage extends Message.Response
                     }
                     break;
                 case CAS_UNCERTAINTY:
-                    CasWriteUncertainException cwue = (CasWriteUncertainException) msg.error;
+                    CasWriteStalledException cwue = (CasWriteStalledException) msg.error;
                     return new WriteTimeoutException(WriteType.CAS, cwue.consistency, cwue.received, cwue.blockFor);
             }
         }

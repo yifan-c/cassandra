@@ -42,7 +42,7 @@ import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.impl.InstanceClassLoader;
 import org.apache.cassandra.exceptions.CasWriteTimeoutException;
-import org.apache.cassandra.exceptions.CasWriteUncertainException;
+import org.apache.cassandra.exceptions.CasWriteStalledException;
 import org.apache.cassandra.net.Verb;
 import org.hamcrest.BaseMatcher;
 import org.hamcrest.CoreMatchers;
@@ -266,7 +266,7 @@ public class CasWriteTest extends DistributedTestBase
         Exception ex = exRef.get();
         Assert.assertNotNull("Expecting exception but found null. Proposer get none acceptance?", ex);
         Assert.assertThat("Expecting RuntimeException", ex, CoreMatchers.instanceOf(RuntimeException.class));
-        Assert.assertTrue("Expecting cause to be CasWriteUncertainException", ex.getMessage().contains(CasWriteUncertainException.class.getCanonicalName()));
+        Assert.assertTrue("Expecting cause to be CasWriteUncertainException", ex.getMessage().contains(CasWriteStalledException.class.getCanonicalName()));
     }
 
     /**
@@ -336,7 +336,7 @@ public class CasWriteTest extends DistributedTestBase
         Exception ex = exRef.get();
         Assert.assertNotNull("Expecting exception but found null. Proposer get none acceptance?", ex);
         Assert.assertThat("Expecting RuntimeException", ex, CoreMatchers.instanceOf(RuntimeException.class));
-        Assert.assertTrue("Expecting cause to be CasWriteUncertainException", ex.getMessage().contains(CasWriteUncertainException.class.getCanonicalName()));
+        Assert.assertTrue("Expecting cause to be CasWriteUncertainException", ex.getMessage().contains(CasWriteStalledException.class.getCanonicalName()));
     }
 
     private void expectCasWriteTimeout()

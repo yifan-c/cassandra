@@ -28,7 +28,7 @@ import org.junit.Test;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.db.WriteType;
 import org.apache.cassandra.exceptions.CasWriteTimeoutException;
-import org.apache.cassandra.exceptions.CasWriteUncertainException;
+import org.apache.cassandra.exceptions.CasWriteStalledException;
 import org.apache.cassandra.exceptions.ReadFailureException;
 import org.apache.cassandra.exceptions.RequestFailureReason;
 import org.apache.cassandra.exceptions.WriteFailureException;
@@ -118,10 +118,10 @@ public class ErrorMessageTest extends EncodeAndDecodeTestBase<ErrorMessage>
     {
         int receivedBlockFor = 3;
         ConsistencyLevel consistencyLevel = ConsistencyLevel.SERIAL;
-        CasWriteUncertainException ex = new CasWriteUncertainException(consistencyLevel, receivedBlockFor, receivedBlockFor);
+        CasWriteStalledException ex = new CasWriteStalledException(consistencyLevel, receivedBlockFor, receivedBlockFor);
 
         ErrorMessage deserialized = encodeThenDecode(ErrorMessage.fromException(ex), ProtocolVersion.V5);
-        CasWriteUncertainException deserializedEx = (CasWriteUncertainException) deserialized.error;
+        CasWriteStalledException deserializedEx = (CasWriteStalledException) deserialized.error;
 
         assertEquals(consistencyLevel, deserializedEx.consistency);
         assertEquals(receivedBlockFor, deserializedEx.received);
