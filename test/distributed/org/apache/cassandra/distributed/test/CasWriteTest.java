@@ -40,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.distributed.Cluster;
-import org.apache.cassandra.distributed.api.IMessageFilters;
 import org.apache.cassandra.distributed.impl.InstanceClassLoader;
 import org.apache.cassandra.exceptions.CasWriteTimeoutException;
 import org.apache.cassandra.exceptions.CasWriteUncertainException;
@@ -98,26 +97,50 @@ public class CasWriteTest extends DistributedTestBase
     }
 
     @Test
-    public void testCasWriteTimeoutAtPreparePhase()
+    public void testCasWriteTimeoutAtPreparePhase_ReqLost()
     {
         expectCasWriteTimeout();
-        cluster.verbs(Verb.PAXOS_PREPARE_REQ).to(2, 3).drop().on(); // drop the internode messages to acceptors
+        cluster.verbs(Verb.PAXOS_PREPARE_REQ).from(1).to(2, 3).drop().on(); // drop the internode messages to acceptors
         cluster.coordinator(1).execute(mkUniqueCasInsertQuery(1), ConsistencyLevel.QUORUM);
     }
 
     @Test
-    public void testCasWriteTimeoutAtProposePhase()
+    public void testCasWriteTimeoutAtPreparePhase_RspLost()
     {
         expectCasWriteTimeout();
-        cluster.verbs(Verb.PAXOS_PROPOSE_REQ).to(2, 3).drop().on();
+        cluster.verbs(Verb.PAXOS_PREPARE_RSP).from(2, 3).to(1).drop().on(); // drop the internode messages to acceptors
         cluster.coordinator(1).execute(mkUniqueCasInsertQuery(1), ConsistencyLevel.QUORUM);
     }
 
     @Test
-    public void testCasWriteTimeoutAtCommitPhase()
+    public void testCasWriteTimeoutAtProposePhase_ReqLost()
     {
         expectCasWriteTimeout();
-        cluster.verbs(Verb.PAXOS_COMMIT_REQ).to(2, 3).drop().on();
+        cluster.verbs(Verb.PAXOS_PROPOSE_REQ).from(1).to(2, 3).drop().on();
+        cluster.coordinator(1).execute(mkUniqueCasInsertQuery(1), ConsistencyLevel.QUORUM);
+    }
+
+    @Test
+    public void testCasWriteTimeoutAtProposePhase_RspLost()
+    {
+        expectCasWriteTimeout();
+        cluster.verbs(Verb.PAXOS_PROPOSE_RSP).from(2, 3).to(1).drop().on();
+        cluster.coordinator(1).execute(mkUniqueCasInsertQuery(1), ConsistencyLevel.QUORUM);
+    }
+
+    @Test
+    public void testCasWriteTimeoutAtCommitPhase_ReqLost()
+    {
+        expectCasWriteTimeout();
+        cluster.verbs(Verb.PAXOS_COMMIT_REQ).from(1).to(2, 3).drop().on();
+        cluster.coordinator(1).execute(mkUniqueCasInsertQuery(1), ConsistencyLevel.QUORUM);
+    }
+
+    @Test
+    public void testCasWriteTimeoutAtCommitPhase_RspLost()
+    {
+        expectCasWriteTimeout();
+        cluster.verbs(Verb.PAXOS_COMMIT_RSP).from(2, 3).to(1).drop().on();
         cluster.coordinator(1).execute(mkUniqueCasInsertQuery(1), ConsistencyLevel.QUORUM);
     }
 
