@@ -18,6 +18,12 @@
 
 package org.apache.cassandra.distributed.test;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -27,6 +33,8 @@ import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.impl.IInvokableInstance;
+import org.apache.cassandra.exceptions.ReadTimeoutException;
+import org.apache.cassandra.net.Verb;
 
 import static org.apache.cassandra.distributed.api.Feature.NETWORK;
 import static org.junit.Assert.assertEquals;
@@ -113,6 +121,63 @@ public class DistributedReadWritePathTest extends DistributedTestBase
             assertRows(cluster.coordinator(1).execute("SELECT * FROM " + KEYSPACE + ".tbl WHERE pk = 1",
                                                      ConsistencyLevel.ALL), // ensure node3 in preflist
                        row(1, 1, 1));
+
+            // Verify that data got repaired to the third node
+            assertRows(cluster.get(3).executeInternal("SELECT * FROM " + KEYSPACE + ".tbl WHERE pk = 1"),
+                       row(1, 1, 1));
+        }
+    }
+
+    @Test
+    public void readRepairTimeoutTest() throws Throwable
+    {
+        try (Cluster cluster = init(Cluster.create(3)))
+        {
+            cluster.schemaChange("CREATE TABLE " + KEYSPACE + ".tbl (pk int, ck int, v int, PRIMARY KEY (pk, ck)) WITH read_repair='blocking'");
+
+            cluster.get(1).executeInternal("INSERT INTO " + KEYSPACE + ".tbl (pk, ck, v) VALUES (1, 1, 1)");
+            cluster.get(2).executeInternal("INSERT INTO " + KEYSPACE + ".tbl (pk, ck, v) VALUES (1, 1, 1)");
+
+            assertRows(cluster.get(3).executeInternal("SELECT * FROM " + KEYSPACE + ".tbl WHERE pk = 1"));
+
+            final long readTimeoutMillis = DatabaseDescriptor.getReadRpcTimeout(TimeUnit.MILLISECONDS);
+            final long writeTimeoutMillis = DatabaseDescriptor.getWriteRpcTimeout(TimeUnit.MILLISECONDS);
+            final long bufferMillis = 500L; // add a buffer so that no single step in the read with read repair can fail
+            final CountDownLatch readRepairReqLatch = new CountDownLatch(1);
+            final CountDownLatch readReqLatch = new CountDownLatch(1);
+            final CountDownLatch readRepairReady = new CountDownLatch(1);
+            cluster.verbs(READ_REPAIR_REQ) // add networking delay to the READ_REPAIR_REQ
+                   .to(3)
+                   .intercept(() -> {
+                       readRepairReady.countDown();
+                       Uninterruptibles.awaitUninterruptibly(readRepairReqLatch);
+                   })
+                   .on();
+            cluster.verbs(Verb.READ_REQ) // add networking delay to the regular READ_REQ
+                   .from(1)
+                   .intercept(() -> Uninterruptibles.awaitUninterruptibly(readReqLatch))
+                   .on();
+
+            Executors.newFixedThreadPool(1)
+                     .submit(() -> {
+                        Uninterruptibles.sleepUninterruptibly(readTimeoutMillis - bufferMillis, TimeUnit.MILLISECONDS);
+                        readReqLatch.countDown();
+                        Uninterruptibles.awaitUninterruptibly(readRepairReady);
+                        Uninterruptibles.sleepUninterruptibly(writeTimeoutMillis - bufferMillis, TimeUnit.MILLISECONDS);
+                        readRepairReqLatch.countDown();
+                     });
+            final long startTime = System.currentTimeMillis();
+            try
+            {
+                cluster.coordinator(1).execute("SELECT * FROM " + KEYSPACE + ".tbl WHERE pk = 1", ConsistencyLevel.ALL); // ensure node3 in preflist
+            }
+            finally
+            {
+                long timetaken = System.currentTimeMillis() - startTime;
+                Assert.assertTrue(timetaken > readTimeoutMillis);
+                System.out.println(String.format("Read with blocking read repair. Read timeout: %d ms. Write timeout: %d ms. Actual time taken: %d ms",
+                                                 readTimeoutMillis, writeTimeoutMillis, timetaken));
+            }
 
             // Verify that data got repaired to the third node
             assertRows(cluster.get(3).executeInternal("SELECT * FROM " + KEYSPACE + ".tbl WHERE pk = 1"),
