@@ -675,7 +675,8 @@ public interface CQL3Type
             {
                 assert values != null : "Got null values type for a collection";
 
-                if (!frozen && values.supportsFreezing() && !values.frozen)
+                // skip if innerType is tuple, since tuple is implicitly forzen
+                if (!frozen && values.supportsFreezing() && !values.frozen && !isTuple(values))
                     throwNestedNonFrozenError(values);
 
                 // we represent supercolumns as maps, internally, and we do allow counters in supercolumns. Thus,
@@ -710,14 +711,17 @@ public interface CQL3Type
                 throw new AssertionError();
             }
 
+            private boolean isTuple(Raw innerType)
+            {
+                return innerType instanceof RawTuple;
+            }
+
             private void throwNestedNonFrozenError(Raw innerType)
             {
                 if (innerType instanceof RawCollection)
                     throw new InvalidRequestException("Non-frozen collections are not allowed inside collections: " + this);
                 else if (innerType.isUDT())
                     throw new InvalidRequestException("Non-frozen UDTs are not allowed inside collections: " + this);
-                else
-                    throw new InvalidRequestException("Non-frozen tuples are not allowed inside collections: " + this);
             }
 
             public boolean referencesUserType(String name)

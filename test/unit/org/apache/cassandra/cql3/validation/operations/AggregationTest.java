@@ -449,6 +449,26 @@ public class AggregationTest extends CQLTester
         assertLastSchemaChange(Event.SchemaChange.Change.DROPPED, Event.SchemaChange.Target.AGGREGATE,
                                KEYSPACE, parseFunctionName(a).name,
                                "double");
+
+        // The aggregate with nested tuple should be created without throwing InvalidRequestException. See CASSANDRA-15857
+        String f1 = createFunction(KEYSPACE,
+                                   "double, double",
+                                   "CREATE OR REPLACE FUNCTION %s(state double, val list<tuple<int, int>>) " +
+                                   "RETURNS NULL ON NULL INPUT " +
+                                   "RETURNS double " +
+                                   "LANGUAGE javascript " +
+                                   "AS '\"string\";';");
+
+        String a1 = createAggregate(KEYSPACE,
+                                    "list<tuple<int, int>>",
+                                    "CREATE OR REPLACE AGGREGATE %s(list<tuple<int, int>>) " +
+                                    "SFUNC " + shortFunctionName(f1) + " " +
+                                    "STYPE double " +
+                                    "INITCOND 0");
+
+        assertLastSchemaChange(Event.SchemaChange.Change.CREATED, Event.SchemaChange.Target.AGGREGATE,
+                               KEYSPACE, parseFunctionName(a1).name,
+                               "list<tuple<int, int>>");
     }
 
     @Test
