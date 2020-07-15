@@ -859,6 +859,14 @@ public interface CQL3Type
             @Override
             public String toString()
             {
+                if (frozen)
+                    return "frozen<" + tupleToString() + '>';
+                else
+                    return tupleToString();
+            }
+
+            private String tupleToString()
+            {
                 StringBuilder sb = new StringBuilder();
                 sb.append("tuple<");
                 for (int i = 0; i < types.size(); i++)
