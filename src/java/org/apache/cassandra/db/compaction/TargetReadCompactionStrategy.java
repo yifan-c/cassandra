@@ -150,6 +150,9 @@ public class TargetReadCompactionStrategy extends AbstractCompactionStrategy
 
         SSTableIntervalTree tree = SSTableIntervalTree.build(overlapCandidates);
 
+        if (tree.isEmpty())
+            return Collections.emptyList();
+
         List<SSTableReader> sortedByFirst = Lists.newArrayList(overlapCandidates);
         sortedByFirst.sort(Comparator.comparing(o -> o.first));
 
@@ -161,8 +164,16 @@ public class TargetReadCompactionStrategy extends AbstractCompactionStrategy
             // Wait until we get past the last covering range
             if (sstable.last.compareTo(last) < 0)
                 continue;
+            last = sstable.last;
 
             List<SSTableReader> overlapping = View.sstablesInBounds(sstable.first, sstable.last, tree);
+            if (overlapping.size() <= 1) // skip when only finding itself
+            {
+                logger.info("Skip the overlapping. Only finding itself.");
+                continue;
+            } else {
+                logger.info("overlaps {} sstables", overlapping.size());
+            }
             PartitionPosition min = sstable.first;
             PartitionPosition max = sstable.last;
             for (SSTableReader overlap : overlapping)
@@ -173,7 +184,6 @@ public class TargetReadCompactionStrategy extends AbstractCompactionStrategy
                     max = overlap.last;
             }
             coveringRanges.add(new Range<>(min, max));
-            last = max;
         }
 
         logger.debug("Found {} covering ranges", coveringRanges.size());
@@ -197,9 +207,7 @@ public class TargetReadCompactionStrategy extends AbstractCompactionStrategy
                 List<SSTableReader> overlappingInRange = View.sstablesInBounds(unwrapped.left, unwrapped.right, tree);
                 for (SSTableReader sstable : overlappingInRange)
                 {
-                    Set<SSTableReader> sstables = sstablesByLevel.get(sstable.getSSTableLevel());
-                    if (sstables == null)
-                        sstables = new HashSet<>();
+                    Set<SSTableReader> sstables = sstablesByLevel.computeIfAbsent(sstable.getSSTableLevel(), k -> new HashSet<>());
                     sstables.add(sstable);
 
                     // TODO add major compaction here
@@ -246,8 +254,9 @@ public class TargetReadCompactionStrategy extends AbstractCompactionStrategy
             }
         }
 
-        candidateScores.sort(Comparator.comparingDouble(s -> s.right));
-        Collections.reverse(candidateScores);
+        Comparator<Pair<List<SSTableReader>, Double>> c = Comparator.<Pair<List<SSTableReader>, Double>>comparingDouble(s -> s.right).reversed();
+        candidateScores.sort(c);
+//        Collections.reverse(candidateScores);
         estimatedRemainingTasks = candidateScores.size();
         logger.trace("Found candidates {}", candidateScores);
 
@@ -463,24 +472,36 @@ public class TargetReadCompactionStrategy extends AbstractCompactionStrategy
 
         // Handle freshly flushed data first, always try to get that into the levels if possible
         List<SSTableReader> sstablesToCompact = findNewlyFlushedSSTables(candidatesSet);
-        if (!sstablesToCompact.isEmpty())
-            return Pair.create(sstablesToCompact, 1);
+        if (sstablesToCompact.size() > 1)
+        {
+            logger.info("compact using NewlyFlushedSSTables: {}", sstablesToCompact);
+            return Pair.create(sstablesToCompact, getLevel(sstablesToCompact)); // it prevents findOverlappingSSTables to run by assign the same level 1 to all sstables.
+        }
 
         // Now we're in the levels, where we will pick tables that overlap enough and then rank them by density
         // tiering
         sstablesToCompact = findOverlappingSSTables(candidatesSet);
-        if (!sstablesToCompact.isEmpty())
+        if (sstablesToCompact.size() > 1)
+        {
+            logger.info("compact using overlapping sstables: {}", sstablesToCompact);
             return Pair.create(sstablesToCompact, getLevel(sstablesToCompact));
+        }
 
         // Handles re-writing sstables if they've gotten too small
         sstablesToCompact = findSmallSSTables(candidatesSet);
-        if (!sstablesToCompact.isEmpty())
+        if (sstablesToCompact.size() > 1)
+        {
+            logger.info("compact using small sstables: {}", sstablesToCompact);
             return Pair.create(sstablesToCompact, sstablesToCompact.get(0).getSSTableLevel());
+        }
 
         // If we get here then check if tombstone compaction is available and do that
         sstablesToCompact = findTombstoneEligibleSSTables(gcBefore, candidatesSet);
-        if (!sstablesToCompact.isEmpty())
+        if (sstablesToCompact.size() > 1)
+        {
+            logger.info("compact using tombstone eligible sstables: {}", sstablesToCompact);
             return Pair.create(sstablesToCompact, sstablesToCompact.get(0).getSSTableLevel());
+        }
 
         return Pair.create(sstablesToCompact, 0);
     }
@@ -498,23 +519,28 @@ public class TargetReadCompactionStrategy extends AbstractCompactionStrategy
             if (sstablesToCompact.isEmpty())
                 return null;
 
+            // todo: there is no more level 1 sstables. also why adjust targetSize?
             // This can only happen from newly flushed sstables
-            if (level == 1) {
-                long totalCount = 0;
-                long totalSize = 0;
-                for (SSTableReader sstable: sstablesToCompact)
-                {
-                    totalCount += SSTableReader.getApproximateKeyCount(Collections.singletonList((sstable)));
-                    totalSize += sstable.bytesOnDisk();
-                }
-                long estimatedCombinedCount = SSTableReader.getApproximateKeyCount(sstablesToCompact);
-
-                double ratio = (double) estimatedCombinedCount / (double) totalCount;
-                targetSize = Math.max(4096, Math.round(((totalSize * ratio) / cfs.getMaximumCompactionThreshold())));
-
-                logger.debug("Level zero compaction yielding {} sstables of size {}mb. Achieving compaction ratio of: {}",
-                             totalSize / targetSize, targetSize / (1024 * 1024), ratio);
-            }
+//            if (level == 1) {
+//                long totalCount = 0;
+//                long totalSize = 0;
+//                for (SSTableReader sstable: sstablesToCompact)
+//                {
+//                    totalCount += SSTableReader.getApproximateKeyCount(Collections.singletonList((sstable)));
+//                    totalSize += sstable.bytesOnDisk();
+//                }
+//                long estimatedCombinedCount = SSTableReader.getApproximateKeyCount(sstablesToCompact);
+//
+//
+//                double ratio = (double) estimatedCombinedCount / (double) totalCount;
+//
+//                logger.info("totalSize: {}; totalCount: {}; ratio: {}", totalSize, totalCount, ratio);
+//
+//                targetSize = Math.max(4096, Math.round(((totalSize * ratio) / cfs.getMaximumCompactionThreshold())));
+//
+//                logger.info("Level zero compaction yielding {} sstables of size {}mb. Achieving compaction ratio of: {}",
+//                             totalSize / targetSize, targetSize / (double) (1024 * 1024), ratio);
+//            }
 
             LifecycleTransaction transaction = cfs.getTracker().tryModify(sstablesToCompact, OperationType.COMPACTION);
             if (transaction != null)
