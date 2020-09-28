@@ -103,7 +103,7 @@ public class GossipTest extends TestBaseImpl
                         catch (Exception ex)
                         {
                             Assert.assertSame(ex.getClass(), IllegalStateException.class);
-                            Assert.assertEquals(ex.getMessage(), "Unable to stop gossip because the node is not in the normal state.");
+                            Assert.assertEquals(ex.getMessage(), "Unable to stop gossip because the node is not in the normal state. Try to stop the node instead.");
                         }
                     });
                 }
