@@ -135,6 +135,17 @@ public class YamlConfigurationLoader implements ConfigurationLoader
         }
     }
 
+    static public <T> T parseYamlString(Class<T> klass, String yamlString)
+    {
+        Constructor constructor = new CustomConstructor(klass, Thread.currentThread().getContextClassLoader());
+        PropertiesChecker propertiesChecker = new PropertiesChecker();
+        constructor.setPropertyUtils(propertiesChecker);
+        Yaml yaml = new Yaml(constructor);
+        T result = yaml.loadAs(new ByteArrayInputStream(yamlString.getBytes()), klass);
+        propertiesChecker.check();
+        return result;
+    }
+
     static class CustomConstructor extends CustomClassLoaderConstructor
     {
         CustomConstructor(Class<?> theRoot, ClassLoader classLoader)

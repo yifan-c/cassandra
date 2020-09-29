@@ -20,8 +20,10 @@ package org.apache.cassandra.distributed.test;
 
 import java.io.IOException;
 
+import org.junit.Assert;
 import org.junit.Test;
 
+import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.utils.FBUtilities;
@@ -48,6 +50,23 @@ public class JVMDTestTest extends TestBaseImpl
             res = cluster.coordinator(1).execute("SELECT writetime(i) FROM "+KEYSPACE+".tbl WHERE id = 2", ConsistencyLevel.ALL);
             assertEquals(1, res.length);
             assertEquals(1000, (long) res[0][0]);
+        }
+    }
+
+    @Test
+    public void useYamlFragmentInConfigTest() throws IOException
+    {
+        String newKeystore = "/new/path/to/keystore";
+        String newTruststore= "/new/path/to/truststore";
+        try (Cluster cluster = Cluster.build(1)
+                                      .withConfig(c -> c.set("server_encryption_options",
+                                                             "keystore: " + newKeystore + "\n" +
+                                                             "truststore: " + newTruststore + "\n")).start())
+        {
+            cluster.get(1).runOnInstance(() -> {
+                Assert.assertEquals(newKeystore, DatabaseDescriptor.getInternodeMessagingEncyptionOptions().keystore);
+                Assert.assertEquals(newTruststore, DatabaseDescriptor.getInternodeMessagingEncyptionOptions().truststore);
+            });
         }
     }
 }
