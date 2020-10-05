@@ -119,14 +119,7 @@ public class YamlConfigurationLoader implements ConfigurationLoader
                 throw new AssertionError(e);
             }
 
-
-            Constructor constructor = new CustomConstructor(Config.class, Yaml.class.getClassLoader());
-            PropertiesChecker propertiesChecker = new PropertiesChecker();
-            constructor.setPropertyUtils(propertiesChecker);
-            Yaml yaml = new Yaml(constructor);
-            Config result = loadConfig(yaml, configBytes);
-            propertiesChecker.check();
-            return result;
+            return loadConfig(configBytes);
         }
         catch (YAMLException e)
         {
@@ -135,13 +128,18 @@ public class YamlConfigurationLoader implements ConfigurationLoader
         }
     }
 
-    static public <T> T parseYamlString(Class<T> klass, String yamlString)
+    public static <T> T parseYamlString(Class<T> klass, String yamlString)
+    {
+        return parseYmalBytes(klass, yamlString.getBytes());
+    }
+
+    private static <T> T parseYmalBytes(Class<T> klass, byte[] configBytes)
     {
         Constructor constructor = new CustomConstructor(klass, Thread.currentThread().getContextClassLoader());
         PropertiesChecker propertiesChecker = new PropertiesChecker();
         constructor.setPropertyUtils(propertiesChecker);
         Yaml yaml = new Yaml(constructor);
-        T result = yaml.loadAs(new ByteArrayInputStream(yamlString.getBytes()), klass);
+        T result = yaml.loadAs(new ByteArrayInputStream(configBytes), klass);
         propertiesChecker.check();
         return result;
     }
@@ -176,9 +174,9 @@ public class YamlConfigurationLoader implements ConfigurationLoader
         }
     }
 
-    private static Config loadConfig(Yaml yaml, byte[] configBytes)
+    private static Config loadConfig(byte[] configBytes)
     {
-        Config config = yaml.loadAs(new ByteArrayInputStream(configBytes), Config.class);
+        Config config = parseYmalBytes(Config.class, configBytes);
         // If the configuration file is empty yaml will return null. In this case we should use the default
         // configuration to avoid hitting a NPE at a later stage.
         return config == null ? new Config() : config;
