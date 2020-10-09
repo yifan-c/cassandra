@@ -26,23 +26,17 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Lists;
 
-import org.apache.cassandra.UpdateBuilder;
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.config.Schema;
 import org.apache.cassandra.cql3.Attributes;
 import org.apache.cassandra.cql3.BatchQueryOptions;
-import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.statements.BatchStatement;
 import org.apache.cassandra.cql3.statements.ModificationStatement;
 import org.apache.cassandra.cql3.statements.ParsedStatement;
-import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.dht.Murmur3Partitioner;
-import org.apache.cassandra.io.util.DataInputBuffer;
-import org.apache.cassandra.io.util.DataOutputBufferFixed;
-import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.schema.KeyspaceMetadata;
 import org.apache.cassandra.schema.KeyspaceParams;
 import org.apache.cassandra.service.QueryState;
@@ -57,12 +51,9 @@ import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.profile.GCProfiler;
-import org.openjdk.jmh.profile.HotspotMemoryProfiler;
-import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.results.Result;
 import org.openjdk.jmh.results.RunResult;
 import org.openjdk.jmh.runner.Runner;
@@ -153,39 +144,4 @@ public class BatchStatementBench
                                + r.getStatistics().getN() + " iterations");
         }
     }
-
-
-    /*
-Benchmark                                                   (batchSize)  (uniquePartition)   Mode  Cnt          Score        Error   Units
-BatchStatementBench.bench                                         10000               true  thrpt    5          0.002 ±      0.001  ops/ms
-BatchStatementBench.bench                                         10000              false  thrpt    5          0.282 ±      0.060  ops/ms
-BatchStatementBench.bench:·gc.alloc.rate                          10000               true  thrpt    5        899.921 ±     82.375  MB/sec
-BatchStatementBench.bench:·gc.alloc.rate                          10000              false  thrpt    5       2821.323 ±    595.978  MB/sec
-BatchStatementBench.bench:·gc.alloc.rate.norm                     10000              false  thrpt    5   11001374.497 ±   4705.964    B/op
-BatchStatementBench.bench:·gc.alloc.rate.norm                     10000               true  thrpt    5  415412801.379 ±   6266.050    B/op
-BatchStatementBench.bench:·gc.churn.PS_Eden_Space                 10000               true  thrpt    5        910.225 ±     83.500  MB/sec
-BatchStatementBench.bench:·gc.churn.PS_Eden_Space                 10000              false  thrpt    5       2820.142 ±    597.190  MB/sec
-BatchStatementBench.bench:·gc.churn.PS_Eden_Space.norm            10000               true  thrpt    5  420169006.389 ± 368132.246    B/op
-BatchStatementBench.bench:·gc.churn.PS_Eden_Space.norm            10000              false  thrpt    5   10996718.493 ±  63323.428    B/op
-BatchStatementBench.bench:·gc.churn.PS_Survivor_Space             10000               true  thrpt    5        127.985 ±     11.445  MB/sec
-BatchStatementBench.bench:·gc.churn.PS_Survivor_Space             10000              false  thrpt    5          4.943 ±      0.990  MB/sec
-BatchStatementBench.bench:·gc.churn.PS_Survivor_Space.norm        10000               true  thrpt    5   59079633.611 ± 142786.571    B/op
-BatchStatementBench.bench:·gc.churn.PS_Survivor_Space.norm        10000              false  thrpt    5      19279.688 ±    726.436    B/op
-BatchStatementBench.bench:·gc.count                               10000               true  thrpt    5       1098.000               counts
-BatchStatementBench.bench:·gc.count                               10000              false  thrpt    5        895.000               counts
-BatchStatementBench.bench:·gc.time                                10000               true  thrpt    5      47690.000                   ms
-BatchStatementBench.bench:·gc.time                                10000              false  thrpt    5       1030.000                   ms
-
-
-
-
-
-
-
-
-
-
-
-
-     */
 }

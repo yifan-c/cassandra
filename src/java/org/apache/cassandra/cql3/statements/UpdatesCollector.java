@@ -39,20 +39,20 @@ final class UpdatesCollector
     private final Map<UUID, PartitionColumns> updatedColumns;
 
     /**
-     * The estimated number of updated row.
+     * The estimated number of updated rows per partition.
      */
-    private final int updatedRows;
+    private final Map<UUID, Map<ByteBuffer, Integer>> partitionCounts;
 
     /**
      * The mutations per keyspace.
      */
     private final Map<String, Map<ByteBuffer, IMutation>> mutations = new HashMap<>();
 
-    public UpdatesCollector(Map<UUID, PartitionColumns> updatedColumns, int updatedRows)
+    public UpdatesCollector(Map<UUID, PartitionColumns> updatedColumns, Map<UUID, Map<ByteBuffer, Integer>> partitionCounts)
     {
         super();
         this.updatedColumns = updatedColumns;
-        this.updatedRows = updatedRows;
+        this.partitionCounts = partitionCounts;
     }
 
     /**
@@ -72,7 +72,7 @@ final class UpdatesCollector
         {
             PartitionColumns columns = updatedColumns.get(cfm.cfId);
             assert columns != null;
-            upd = new PartitionUpdate(cfm, dk, columns, updatedRows);
+            upd = new PartitionUpdate(cfm, dk, columns, partitionCounts.get(cfm.cfId).get(dk.getKey()));
             mut.add(upd);
         }
         return upd;

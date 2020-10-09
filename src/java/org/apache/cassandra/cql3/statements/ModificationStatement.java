@@ -631,20 +631,29 @@ public abstract class ModificationStatement implements CQLStatement
      */
     private Collection<? extends IMutation> getMutations(QueryOptions options, boolean local, long now, long queryStartNanoTime)
     {
-        UpdatesCollector collector = new UpdatesCollector(Collections.singletonMap(cfm.cfId, updatedColumns), 1);
-        addUpdates(collector, options, local, now, queryStartNanoTime);
+        List<ByteBuffer> keys = buildPartitionKeyNames(options);
+        Map<ByteBuffer, Integer> perPartitionKeyCounts = new HashMap<>();
+        for (int i = 0; i < keys.size(); i++)
+        {
+            ByteBuffer key = keys.get(i);
+            int current = perPartitionKeyCounts.getOrDefault(key, 0);
+            perPartitionKeyCounts.put(key, current + 1);
+        }
+
+        UpdatesCollector collector = new UpdatesCollector(Collections.singletonMap(cfm.cfId, updatedColumns), Collections.singletonMap(cfm.cfId, perPartitionKeyCounts));
+        addUpdates(collector, keys, options, local, now, queryStartNanoTime);
         collector.validateIndexedColumns();
 
         return collector.toMutations();
     }
 
     final void addUpdates(UpdatesCollector collector,
+                          List<ByteBuffer> keys,
                           QueryOptions options,
                           boolean local,
                           long now,
                           long queryStartNanoTime)
     {
-        List<ByteBuffer> keys = buildPartitionKeyNames(options);
 
         if (hasSlices())
         {

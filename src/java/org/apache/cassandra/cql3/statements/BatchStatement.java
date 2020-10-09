@@ -223,7 +223,28 @@ public class BatchStatement implements CQLStatement
     throws RequestExecutionException, RequestValidationException
     {
         Set<String> tablesWithZeroGcGs = null;
-        UpdatesCollector collector = new UpdatesCollector(updatedColumns, updatedRows());
+        List<List<ByteBuffer>> partitionKeys = new ArrayList<>(statements.size());
+        Map<UUID, Map<ByteBuffer, Integer>> partitionCounts = new HashMap<>(updatedColumns.size());
+        for (int i = 0, isize = statements.size(); i < isize; i++)
+        {
+            ModificationStatement stmt = statements.get(i);
+            List<ByteBuffer> stmtPartitionKeys = stmt.buildPartitionKeyNames(options.forStatement(i));
+            partitionKeys.add(stmtPartitionKeys);
+            for (int stmtIdx = 0, stmtSize = stmtPartitionKeys.size(); stmtIdx < stmtSize; stmtIdx++)
+            {
+                ByteBuffer bb = stmtPartitionKeys.get(stmtIdx);
+                Map<ByteBuffer, Integer> counts = partitionCounts.get(stmt.cfm.cfId);
+                if (counts == null)
+                {
+                    counts = new HashMap<>();
+                    partitionCounts.put(stmt.cfm.cfId, counts);
+                }
+                int current = counts.getOrDefault(bb, 0);
+                counts.put(bb, current + 1);
+            }
+        }
+
+        UpdatesCollector collector = new UpdatesCollector(updatedColumns, partitionCounts);
         for (int i = 0; i < statements.size(); i++)
         {
             ModificationStatement statement = statements.get(i);
@@ -235,7 +256,7 @@ public class BatchStatement implements CQLStatement
             }
             QueryOptions statementOptions = options.forStatement(i);
             long timestamp = attrs.getTimestamp(now, statementOptions);
-            statement.addUpdates(collector, statementOptions, local, timestamp, queryStartNanoTime);
+            statement.addUpdates(collector, partitionKeys.get(i), statementOptions, local, timestamp, queryStartNanoTime);
         }
 
         if (tablesWithZeroGcGs != null)
@@ -261,7 +282,7 @@ public class BatchStatement implements CQLStatement
     /**
      * Checks batch size to ensure threshold is met. If not, a warning is logged.
      *
-     * @param updates - the batch mutations.
+     * @param mutations - the batch mutations.
      */
     private static void verifyBatchSize(Collection<? extends IMutation> mutations) throws InvalidRequestException
     {
