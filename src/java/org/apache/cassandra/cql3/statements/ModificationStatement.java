@@ -334,12 +334,7 @@ public abstract class ModificationStatement implements CQLStatement
 
     public boolean requiresRead()
     {
-        // Lists SET operation incurs a read.
-        for (Operation op : allOperations())
-            if (op.requiresRead())
-                return true;
-
-        return false;
+        return !requiresRead.isEmpty();
     }
 
     private Map<DecoratedKey, Partition> readRequiredLists(Collection<ByteBuffer> partitionKeys,
