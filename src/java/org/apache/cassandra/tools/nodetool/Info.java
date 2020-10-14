@@ -123,7 +123,7 @@ public class Info extends NodeToolCmd
         // Chunk Cache: Hits, Requests, RecentHitRate, SavePeriodInSeconds
         try
         {
-            System.out.printf("%-23s: entries %d, size %s, capacity %s, %d misses, %d requests, %.3f recent hit rate, %.3f %s miss latency%n",
+            out.printf("%-23s: entries %d, size %s, capacity %s, %d misses, %d requests, %.3f recent hit rate, %.3f %s miss latency%n",
                     "Chunk Cache",
                     probe.getCacheMetric("ChunkCache", "Entries"),
                     FileUtils.stringifyFileSize((long) probe.getCacheMetric("ChunkCache", "Size")),
@@ -143,7 +143,7 @@ public class Info extends NodeToolCmd
         }
 
         // Global table stats
-        System.out.printf("%-23s: %s%%%n", "Percent Repaired", probe.getColumnFamilyMetric(null, null, "PercentRepaired"));
+        out.printf("%-23s: %s%%%n", "Percent Repaired", probe.getColumnFamilyMetric(null, null, "PercentRepaired"));
 
         // check if node is already joined, before getting tokens, since it throws exception if not.
         if (probe.isJoined())
