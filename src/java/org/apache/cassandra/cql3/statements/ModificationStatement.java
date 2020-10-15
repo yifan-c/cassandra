@@ -665,8 +665,9 @@ public abstract class ModificationStatement implements CQLStatement
                                                            local,
                                                            now,
                                                            queryStartNanoTime);
-            for (ByteBuffer key : keys)
+            for (int i = 0, isize = keys.size(); i < isize; i++)
             {
+                ByteBuffer key = keys.get(i);
                 ThriftValidation.validateKey(cfm, key);
                 DecoratedKey dk = cfm.decorateKey(key);
 
@@ -686,8 +687,9 @@ public abstract class ModificationStatement implements CQLStatement
 
             UpdateParameters params = makeUpdateParameters(keys, clusterings, options, local, now, queryStartNanoTime);
 
-            for (ByteBuffer key : keys)
+            for (int i = 0, isize = keys.size(); i < isize; i++)
             {
+                ByteBuffer key = keys.get(i);
                 ThriftValidation.validateKey(cfm, key);
                 DecoratedKey dk = cfm.decorateKey(key);
 
