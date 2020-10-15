@@ -320,4 +320,14 @@ final class PrimaryKeyRestrictionSet extends AbstractPrimaryKeyRestrictions impl
     {
         return restrictions.iterator();
     }
+
+    public boolean isEmpty()
+    {
+        return restrictions.isEmpty();
+    }
+
+    public int size()
+    {
+        return restrictions.size();
+    }
 }
