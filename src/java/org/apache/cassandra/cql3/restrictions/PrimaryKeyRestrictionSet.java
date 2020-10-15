@@ -160,7 +160,7 @@ final class PrimaryKeyRestrictionSet extends AbstractPrimaryKeyRestrictions impl
     @Override
     public NavigableSet<Clustering> valuesAsClustering(QueryOptions options) throws InvalidRequestException
     {
-        return appendTo(MultiCBuilder.create(comparator), options).build();
+        return appendTo(MultiCBuilder.create(comparator, size()), options).build();
     }
 
     @Override
@@ -184,7 +184,7 @@ final class PrimaryKeyRestrictionSet extends AbstractPrimaryKeyRestrictions impl
     @Override
     public NavigableSet<Slice.Bound> boundsAsClustering(Bound bound, QueryOptions options) throws InvalidRequestException
     {
-        MultiCBuilder builder = MultiCBuilder.create(comparator);
+        MultiCBuilder builder = MultiCBuilder.create(comparator, restrictions.size());
         int keyPosition = 0;
         for (Restriction r : restrictions)
         {
