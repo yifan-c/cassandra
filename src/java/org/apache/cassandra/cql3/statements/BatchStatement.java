@@ -269,9 +269,26 @@ public class BatchStatement implements CQLStatement
                                                          int nowInSeconds,
                                                          long queryStartNanoTime)
     {
+        List<List<ByteBuffer>> partitionKeys = new ArrayList<>(statements.size());
+        Map<TableId, Map<ByteBuffer, Integer>> partitionCounts = new HashMap<>(updatedColumns.size());
+        for (int i = 0, isize = statements.size(); i < isize; i++)
+        {
+            ModificationStatement stmt = statements.get(i);
+            partitionCounts.computeIfAbsent(stmt.metadata.id, k -> new HashMap<>());
+            Map<ByteBuffer, Integer> perKeyCounts = partitionCounts.get(stmt.metadata.id);
+            List<ByteBuffer> stmtPartitionKeys = stmt.buildPartitionKeyNames(options.forStatement(i));
+            partitionKeys.add(stmtPartitionKeys);
+            for (int stmtIdx = 0, stmtSize = stmtPartitionKeys.size(); stmtIdx < stmtSize; stmtIdx++)
+            {
+                ByteBuffer bb = stmtPartitionKeys.get(stmtIdx);
+                int current = perKeyCounts.getOrDefault(bb, 0);
+                partitionCounts.get(stmt.metadata.id).put(bb, current + 1);
+            }
+        }
+
         Set<String> tablesWithZeroGcGs = null;
-        BatchUpdatesCollector collector = new BatchUpdatesCollector(updatedColumns, updatedRows());
-        for (int i = 0; i < statements.size(); i++)
+        UpdatesCollector collector = new BatchUpdatesCollector(updatedColumns, partitionCounts);
+        for (int i = 0, isize = statements.size(); i < isize; i++)
         {
             ModificationStatement statement = statements.get(i);
             if (isLogged() && statement.metadata().params.gcGraceSeconds == 0)
@@ -282,7 +299,7 @@ public class BatchStatement implements CQLStatement
             }
             QueryOptions statementOptions = options.forStatement(i);
             long timestamp = attrs.getTimestamp(batchTimestamp, statementOptions);
-            statement.addUpdates(collector, statementOptions, local, timestamp, nowInSeconds, queryStartNanoTime);
+            statement.addUpdates(collector, partitionKeys.get(i), statementOptions, local, timestamp, nowInSeconds, queryStartNanoTime);
         }
 
         if (tablesWithZeroGcGs != null)

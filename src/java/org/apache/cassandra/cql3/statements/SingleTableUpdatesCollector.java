@@ -32,6 +32,7 @@ import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RegularAndStaticColumns;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.virtual.VirtualMutation;
+import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 
 /**
@@ -52,7 +53,7 @@ final class SingleTableUpdatesCollector implements UpdatesCollector
     /**
      * The estimated number of updated row.
      */
-    private final int updatedRows;
+    private final Map<ByteBuffer, Integer> perPartitionKeyCounts;
 
     /**
      * the partition update builders per key
@@ -64,18 +65,18 @@ final class SingleTableUpdatesCollector implements UpdatesCollector
      */
     private ConsistencyLevel counterConsistencyLevel = null;
 
-    SingleTableUpdatesCollector(TableMetadata metadata, RegularAndStaticColumns updatedColumns, int updatedRows)
+    SingleTableUpdatesCollector(TableMetadata metadata, RegularAndStaticColumns updatedColumns, Map<ByteBuffer, Integer> perPartitionKeyCounts)
     {
         this.metadata = metadata;
         this.updatedColumns = updatedColumns;
-        this.updatedRows = updatedRows;
+        this.perPartitionKeyCounts = perPartitionKeyCounts;
     }
 
     public PartitionUpdate.Builder getPartitionUpdateBuilder(TableMetadata metadata, DecoratedKey dk, ConsistencyLevel consistency)
     {
         if (metadata.isCounter())
             counterConsistencyLevel = consistency;
-        return puBuilders.computeIfAbsent(dk.getKey(), (k) -> new PartitionUpdate.Builder(metadata, dk, updatedColumns, updatedRows));
+        return puBuilders.computeIfAbsent(dk.getKey(), (k) -> new PartitionUpdate.Builder(metadata, dk, updatedColumns, perPartitionKeyCounts.get(dk.getKey())));
     }
 
     /**

@@ -22,6 +22,7 @@ import java.util.*;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -365,11 +366,7 @@ public abstract class ModificationStatement implements CQLStatement
     public boolean requiresRead()
     {
         // Lists SET operation incurs a read.
-        for (Operation op : allOperations())
-            if (op.requiresRead())
-                return true;
-
-        return false;
+        return !requiresRead.isEmpty();
     }
 
     private Map<DecoratedKey, Partition> readRequiredLists(Collection<ByteBuffer> partitionKeys,
@@ -684,20 +681,27 @@ public abstract class ModificationStatement implements CQLStatement
                                                          int nowInSeconds,
                                                          long queryStartNanoTime)
     {
-        UpdatesCollector collector = new SingleTableUpdatesCollector(metadata, updatedColumns, 1);
-        addUpdates(collector, options, local, timestamp, nowInSeconds, queryStartNanoTime);
+        List<ByteBuffer> keys = buildPartitionKeyNames(options);
+        Map<ByteBuffer, Integer> perPartitionKeyCounts = Maps.newHashMapWithExpectedSize(keys.size());
+        for (int i = 0; i < keys.size(); i++)
+        {
+            ByteBuffer key = keys.get(i);
+            int current = perPartitionKeyCounts.getOrDefault(key, 0);
+            perPartitionKeyCounts.put(key, current + 1);
+        }
+        SingleTableUpdatesCollector collector = new SingleTableUpdatesCollector(metadata, updatedColumns, perPartitionKeyCounts);
+        addUpdates(collector, keys, options, local, timestamp, nowInSeconds, queryStartNanoTime);
         return collector.toMutations();
     }
 
     final void addUpdates(UpdatesCollector collector,
+                          List<ByteBuffer> keys,
                           QueryOptions options,
                           boolean local,
                           long timestamp,
                           int nowInSeconds,
                           long queryStartNanoTime)
     {
-        List<ByteBuffer> keys = buildPartitionKeyNames(options);
-
         if (hasSlices())
         {
             Slices slices = createSlices(options);
