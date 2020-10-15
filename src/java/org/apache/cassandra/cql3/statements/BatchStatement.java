@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import org.slf4j.Logger;
@@ -261,7 +262,8 @@ public class BatchStatement implements CQLStatement
         return statements;
     }
 
-    private List<? extends IMutation> getMutations(BatchQueryOptions options,
+    @VisibleForTesting
+    public List<? extends IMutation> getMutations(BatchQueryOptions options,
                                                          boolean local,
                                                          long batchTimestamp,
                                                          int nowInSeconds,
