@@ -224,7 +224,7 @@ public class BatchStatement implements CQLStatement
     {
         Set<String> tablesWithZeroGcGs = null;
         List<List<ByteBuffer>> partitionKeys = new ArrayList<>(statements.size());
-        Map<UUID, Map<ByteBuffer, Integer>> partitionCounts = new HashMap<>(updatedColumns.size());
+        Map<UUID, Map<ByteBuffer, Integer>> partitionCounts = Maps.newHashMapWithExpectedSize(updatedColumns.size());
         for (int i = 0, isize = statements.size(); i < isize; i++)
         {
             ModificationStatement stmt = statements.get(i);
@@ -270,13 +270,6 @@ public class BatchStatement implements CQLStatement
 
 //        collector.validateIndexedColumns();
         return collector.toMutations();
-    }
-
-    private int updatedRows()
-    {
-        // Note: it's possible for 2 statements to actually apply to the same row, but that's just an estimation
-        // for sizing our PartitionUpdate backing array, so it's good enough.
-        return statements.size();
     }
 
     /**

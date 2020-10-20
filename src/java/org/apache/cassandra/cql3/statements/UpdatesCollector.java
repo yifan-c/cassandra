@@ -20,6 +20,8 @@ package org.apache.cassandra.cql3.statements;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import com.google.common.collect.Maps;
+
 import org.apache.cassandra.config.CFMetaData;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
@@ -48,13 +50,14 @@ final class UpdatesCollector
     /**
      * The mutations per keyspace.
      */
-    private final Map<String, Map<ByteBuffer, IMutation>> mutations = new HashMap<>();
+    private final Map<String, Map<ByteBuffer, IMutation>> mutations;
 
     public UpdatesCollector(Map<UUID, PartitionColumns> updatedColumns, Map<UUID, Map<ByteBuffer, Integer>> partitionCounts)
     {
         super();
         this.updatedColumns = updatedColumns;
         this.partitionCounts = partitionCounts;
+        mutations = Maps.newHashMapWithExpectedSize(partitionCounts.size()); // most often this is too big - optimised for the single-table case
     }
 
     /**
@@ -116,7 +119,7 @@ final class UpdatesCollector
         if (mutations.size() == 1)
             return mutations.values().iterator().next().values();
 
-        List<IMutation> ms = new ArrayList<>();
+        List<IMutation> ms = new ArrayList<>(mutations.size());
         for (Map<ByteBuffer, IMutation> ksMap : mutations.values())
             ms.addAll(ksMap.values());
 
