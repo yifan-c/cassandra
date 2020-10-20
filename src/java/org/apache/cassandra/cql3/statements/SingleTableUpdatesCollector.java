@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.Maps;
+
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.db.CounterMutation;
 import org.apache.cassandra.db.DecoratedKey;
@@ -58,7 +60,7 @@ final class SingleTableUpdatesCollector implements UpdatesCollector
     /**
      * the partition update builders per key
      */
-    private final Map<ByteBuffer, PartitionUpdate.Builder> puBuilders = new HashMap<>();
+    private final Map<ByteBuffer, PartitionUpdate.Builder> puBuilders;
 
     /**
      * if it is a counter table, we will set this
@@ -70,13 +72,20 @@ final class SingleTableUpdatesCollector implements UpdatesCollector
         this.metadata = metadata;
         this.updatedColumns = updatedColumns;
         this.perPartitionKeyCounts = perPartitionKeyCounts;
+        this.puBuilders = Maps.newHashMapWithExpectedSize(perPartitionKeyCounts.size());
     }
 
     public PartitionUpdate.Builder getPartitionUpdateBuilder(TableMetadata metadata, DecoratedKey dk, ConsistencyLevel consistency)
     {
         if (metadata.isCounter())
             counterConsistencyLevel = consistency;
-        return puBuilders.computeIfAbsent(dk.getKey(), (k) -> new PartitionUpdate.Builder(metadata, dk, updatedColumns, perPartitionKeyCounts.get(dk.getKey())));
+        PartitionUpdate.Builder builder = puBuilders.get(dk.getKey());
+        if (builder == null)
+        {
+            builder = new PartitionUpdate.Builder(metadata, dk, updatedColumns, perPartitionKeyCounts.get(dk.getKey()));
+            puBuilders.put(dk.getKey(), builder);
+        }
+        return builder;
     }
 
     /**
@@ -85,7 +94,7 @@ final class SingleTableUpdatesCollector implements UpdatesCollector
      */
     public List<IMutation> toMutations()
     {
-        List<IMutation> ms = new ArrayList<>();
+        List<IMutation> ms = new ArrayList<>(puBuilders.size());
         for (PartitionUpdate.Builder builder : puBuilders.values())
         {
             IMutation mutation;

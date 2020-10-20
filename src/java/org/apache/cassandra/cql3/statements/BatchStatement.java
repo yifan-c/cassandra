@@ -269,6 +269,8 @@ public class BatchStatement implements CQLStatement
                                                          int nowInSeconds,
                                                          long queryStartNanoTime)
     {
+        if (statements.isEmpty())
+            return Collections.emptyList();
         List<List<ByteBuffer>> partitionKeys = new ArrayList<>(statements.size());
         Map<TableId, Map<ByteBuffer, Integer>> partitionCounts = new HashMap<>(updatedColumns.size());
         TableMetadata metadata = statements.get(0).metadata;
