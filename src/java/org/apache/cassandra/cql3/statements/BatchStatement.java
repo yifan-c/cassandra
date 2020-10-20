@@ -271,11 +271,14 @@ public class BatchStatement implements CQLStatement
     {
         List<List<ByteBuffer>> partitionKeys = new ArrayList<>(statements.size());
         Map<TableId, Map<ByteBuffer, Integer>> partitionCounts = new HashMap<>(updatedColumns.size());
+        TableMetadata metadata = statements.get(0).metadata;
         for (int i = 0, isize = statements.size(); i < isize; i++)
         {
             ModificationStatement stmt = statements.get(i);
             partitionCounts.computeIfAbsent(stmt.metadata.id, k -> new HashMap<>());
             Map<ByteBuffer, Integer> perKeyCounts = partitionCounts.get(stmt.metadata.id);
+            if (!stmt.metadata.equals(metadata))
+                metadata = null;
             List<ByteBuffer> stmtPartitionKeys = stmt.buildPartitionKeyNames(options.forStatement(i));
             partitionKeys.add(stmtPartitionKeys);
             for (int stmtIdx = 0, stmtSize = stmtPartitionKeys.size(); stmtIdx < stmtSize; stmtIdx++)
@@ -287,7 +290,12 @@ public class BatchStatement implements CQLStatement
         }
 
         Set<String> tablesWithZeroGcGs = null;
-        UpdatesCollector collector = new BatchUpdatesCollector(updatedColumns, partitionCounts);
+        UpdatesCollector collector;
+        if (metadata != null)
+            collector = new SingleTableUpdatesCollector(metadata, updatedColumns.get(metadata.id), partitionCounts.get(metadata.id));
+        else
+            collector = new BatchUpdatesCollector(updatedColumns, partitionCounts);
+
         for (int i = 0, isize = statements.size(); i < isize; i++)
         {
             ModificationStatement statement = statements.get(i);
