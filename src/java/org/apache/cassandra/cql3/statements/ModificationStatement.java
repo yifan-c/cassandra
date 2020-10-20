@@ -664,7 +664,8 @@ public abstract class ModificationStatement implements CQLStatement
                                                            DataLimits.NONE,
                                                            local,
                                                            now,
-                                                           queryStartNanoTime);
+                                                           queryStartNanoTime,
+                                                           (int) (collector.createdAt / 1000));
             for (int i = 0, isize = keys.size(); i < isize; i++)
             {
                 ByteBuffer key = keys.get(i);
@@ -685,7 +686,7 @@ public abstract class ModificationStatement implements CQLStatement
             if (restrictions.hasClusteringColumnsRestrictions() && clusterings.isEmpty())
                 return;
 
-            UpdateParameters params = makeUpdateParameters(keys, clusterings, options, local, now, queryStartNanoTime);
+            UpdateParameters params = makeUpdateParameters(keys, clusterings, options, local, now, queryStartNanoTime, (int) (collector.createdAt / 1000));
 
             for (int i = 0, isize = keys.size(); i < isize; i++)
             {
@@ -731,7 +732,8 @@ public abstract class ModificationStatement implements CQLStatement
                                                   QueryOptions options,
                                                   boolean local,
                                                   long now,
-                                                  long queryStartNanoTime)
+                                                  long queryStartNanoTime,
+                                                  int nowInSec)
     {
         if (clusterings.contains(Clustering.STATIC_CLUSTERING))
             return makeUpdateParameters(keys,
@@ -740,7 +742,8 @@ public abstract class ModificationStatement implements CQLStatement
                                         DataLimits.cqlLimits(1),
                                         local,
                                         now,
-                                        queryStartNanoTime);
+                                        queryStartNanoTime,
+                                        nowInSec);
 
         return makeUpdateParameters(keys,
                                     new ClusteringIndexNamesFilter(clusterings, false),
@@ -748,7 +751,8 @@ public abstract class ModificationStatement implements CQLStatement
                                     DataLimits.NONE,
                                     local,
                                     now,
-                                    queryStartNanoTime);
+                                    queryStartNanoTime,
+                                    nowInSec);
     }
 
     private UpdateParameters makeUpdateParameters(Collection<ByteBuffer> keys,
@@ -757,7 +761,8 @@ public abstract class ModificationStatement implements CQLStatement
                                                   DataLimits limits,
                                                   boolean local,
                                                   long now,
-                                                  long queryStartNanoTime)
+                                                  long queryStartNanoTime,
+                                                  int nowInSec)
     {
         // Some lists operation requires reading
         Map<DecoratedKey, Partition> lists = readRequiredLists(keys, filter, limits, local, options.getConsistency(), queryStartNanoTime);

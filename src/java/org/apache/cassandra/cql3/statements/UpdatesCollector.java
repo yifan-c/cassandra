@@ -45,7 +45,7 @@ final class UpdatesCollector
      */
     private final Map<UUID, Map<ByteBuffer, Integer>> partitionCounts;
 
-    private final long createdAt = System.currentTimeMillis();
+    public final long createdAt = System.currentTimeMillis();
 
     /**
      * The mutations per keyspace.
@@ -77,7 +77,7 @@ final class UpdatesCollector
         {
             PartitionColumns columns = updatedColumns.get(cfm.cfId);
             assert columns != null;
-            upd = new PartitionUpdate(cfm, dk, columns, partitionCounts.get(cfm.cfId).get(dk.getKey()));
+            upd = new PartitionUpdate(cfm, dk, columns, partitionCounts.get(cfm.cfId).get(dk.getKey()), (int)(createdAt / 1000));
             mut.add(upd);
         }
         return upd;
@@ -101,7 +101,7 @@ final class UpdatesCollector
         IMutation mutation = keyspaceMap(ksName).get(dk.getKey());
         if (mutation == null)
         {
-            Mutation mut = new Mutation(ksName, dk, createdAt);
+            Mutation mut = new Mutation(ksName, dk, createdAt, cfm.params.cdc);
             mutation = cfm.isCounter() ? new CounterMutation(mut, consistency) : mut;
             keyspaceMap(ksName).put(dk.getKey(), mutation);
             return mut;

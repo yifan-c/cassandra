@@ -68,9 +68,9 @@ public class Mutation implements IMutation
         this(keyspaceName, key, new HashMap<>());
     }
 
-    public Mutation(String keyspaceName, DecoratedKey key, long createdAt)
+    public Mutation(String keyspaceName, DecoratedKey key, long createdAt, boolean cdcEnabled)
     {
-        this(keyspaceName, key, new HashMap<>(), createdAt);
+        this(keyspaceName, key, new HashMap<>(), createdAt, cdcEnabled);
     }
 
     public Mutation(PartitionUpdate update)
@@ -85,12 +85,24 @@ public class Mutation implements IMutation
 
     private Mutation(String keyspaceName, DecoratedKey key, Map<UUID, PartitionUpdate> modifications, long createdAt)
     {
+        this(keyspaceName, key, modifications, createdAt, cdcEnabled(modifications));
+    }
+
+    private Mutation(String keyspaceName, DecoratedKey key, Map<UUID, PartitionUpdate> modifications, long createdAt, boolean cdcEnabled)
+    {
         this.keyspaceName = keyspaceName;
         this.key = key;
         this.modifications = modifications;
+        this.cdcEnabled = cdcEnabled;
+        this.createdAt = createdAt;
+    }
+
+    private static boolean cdcEnabled(Map<UUID, PartitionUpdate> modifications)
+    {
+        boolean cdcEnabled = false;
         for (PartitionUpdate pu : modifications.values())
             cdcEnabled |= pu.metadata().params.cdc;
-        this.createdAt = createdAt;
+        return cdcEnabled;
     }
 
     public Mutation copy()
