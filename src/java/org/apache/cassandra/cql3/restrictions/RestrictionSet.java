@@ -251,6 +251,6 @@ final class RestrictionSet implements Restrictions, Iterable<Restriction>
     @Override
     public Iterator<Restriction> iterator()
     {
-        return restrictions.values().iterator();
+        return new LinkedHashSet<>(restrictions.values()).iterator();
     }
 }
