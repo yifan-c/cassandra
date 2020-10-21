@@ -149,6 +149,8 @@ final class TreeBuilder
     {
         assert updateF != null;
 
+        int origSize = size;
+
         NodeBuilder current = rootBuilder;
         // we descend only to avoid wasting memory; in update() we will often descend into existing trees
         // so here we want to descend also, so we don't have lg max(N) depth in both directions
@@ -156,8 +158,8 @@ final class TreeBuilder
             current = current.ensureChild();
 
         current.reset(EMPTY_LEAF, POSITIVE_INFINITY, updateF, null);
-        for (K key : source)
-            current.addNewKey(key);
+        for (int i = 0; i < origSize; i++)
+            current.addNewKey(source[i]);
 
         current = current.ascendToRoot();
 
