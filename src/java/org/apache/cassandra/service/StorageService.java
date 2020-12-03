@@ -5810,4 +5810,26 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     {
         DatabaseDescriptor.setAutoOptimisePreviewRepairStreams(enabled);
     }
+
+    public int getTableCountWarnThreshold()
+    {
+        return DatabaseDescriptor.tableCountWarnThreshold();
+    }
+
+    public void setTableCountWarnThreshold(int value)
+    {
+        logger.info("Changing table count warn threshold from {} to {}", getTableCountWarnThreshold(), value);
+        DatabaseDescriptor.setTableCountWarnThreshold(value);
+    }
+
+    public int getKeyspaceCountWarnThreshold()
+    {
+        return DatabaseDescriptor.keyspaceCountWarnThreshold();
+    }
+
+    public void setKeyspaceCountWarnThreshold(int value)
+    {
+        logger.info("Changing keyspace count warn threshold from {} to {}", getKeyspaceCountWarnThreshold(), value);
+        DatabaseDescriptor.setKeyspaceCountWarnThreshold(value);
+    }
 }
