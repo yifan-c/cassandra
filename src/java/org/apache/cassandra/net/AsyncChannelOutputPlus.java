@@ -19,7 +19,11 @@ package org.apache.cassandra.net;
 
 import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelPromise;
@@ -141,6 +145,8 @@ public abstract class AsyncChannelOutputPlus extends BufferedDataOutputStreamPlu
         flushing += bytesToWrite;
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(AsyncChannelOutputPlus.class);
+
     /**
      * Implementation of waitForSpace, which calculates what flushed points we need to wait for,
      * parks if necessary and propagates flush failures.
@@ -149,12 +155,14 @@ public abstract class AsyncChannelOutputPlus extends BufferedDataOutputStreamPlu
      */
     void waitUntilFlushed(int wakeUpWhenExcessBytesWritten, int signalWhenExcessBytesWritten) throws IOException
     {
+        long nanos = System.nanoTime();
         // we assume that we are happy to wake up at least as early as we will be signalled; otherwise we will never exit
         assert signalWhenExcessBytesWritten <= wakeUpWhenExcessBytesWritten;
         // flushing shouldn't change during this method invocation, so our calculations for signal and flushed are consistent
         long wakeUpWhenFlushed = flushing - wakeUpWhenExcessBytesWritten;
         if (flushed < wakeUpWhenFlushed)
             parkUntilFlushed(wakeUpWhenFlushed, flushing - signalWhenExcessBytesWritten);
+        logger.debug("flush took micros: " + TimeUnit.NANOSECONDS.toMicros(System.nanoTime() - nanos));
         propagateFailedFlush();
     }
 

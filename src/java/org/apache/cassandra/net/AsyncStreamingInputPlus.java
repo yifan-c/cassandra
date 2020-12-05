@@ -27,6 +27,9 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Ints;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
@@ -183,12 +186,17 @@ public class AsyncStreamingInputPlus extends RebufferingInputStream
         return Ints.checkedCast(count);
     }
 
+    private static final Logger logger = LoggerFactory.getLogger(AsyncStreamingInputPlus.class);
+
     // TODO:JEB add docs
     // TL;DR if there's no Bufs open anywhere here, issue a channle read to try and grab data.
     public void maybeIssueRead()
     {
         if (isEmpty())
+        {
+            logger.debug("Issueing a channel read.");
             channel.read();
+        }
     }
 
     public boolean isEmpty()

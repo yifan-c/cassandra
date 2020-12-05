@@ -67,8 +67,10 @@ public class StreamingTCPConnectionTimedoutTest extends TestBaseImpl
         {
             if (enabled.get())
             {
-                System.out.println("node2 <--- block CassandraCompressedStreamReader.read for 10 seconds");
-                Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
+                int wait = 290;
+                System.out.println("node2 <--- block CassandraCompressedStreamReader.read for " + wait + " seconds");
+                Uninterruptibles.sleepUninterruptibly(wait, TimeUnit.SECONDS);
+                enabled.set(false);
             }
             return r.call();
         }
@@ -84,6 +86,7 @@ public class StreamingTCPConnectionTimedoutTest extends TestBaseImpl
                                         .withDataDirCount(1) // this test expects there to only be a single sstable to stream (with ddirs = 3, we get 3 sstables)
                                         .withConfig(config -> config.with(NETWORK, NATIVE_PROTOCOL, GOSSIP)
                                                                     .set("internode_tcp_user_timeout_in_ms", 3000)
+                                                                    .set("internode_streaming_tcp_user_timeout_in_ms", 300000)
                                                                     .set("internode_socket_receive_buffer_size_in_bytes", 1024)
                                                                     .set("internode_socket_send_buffer_size_in_bytes", 1024)
                                                                     .set("stream_entire_sstables", false)
@@ -97,7 +100,7 @@ public class StreamingTCPConnectionTimedoutTest extends TestBaseImpl
                 final int num = n;
                 cluster.get(n).runOnInstance(() -> {
                     System.out.println("node" + num + " <--- using epoll? " + NativeTransportService.useEpoll());
-                    System.out.println("node" + num + " <--- tcp user timeout? " + DatabaseDescriptor.getInternodeTcpUserTimeoutInMS());
+                    System.out.println("node" + num + " <--- tcp user timeout? " + DatabaseDescriptor.getInternodeStreamingTcpUserTimeoutInMS());
                 });
             }
             for (int k = 0; k < 5; k++)
