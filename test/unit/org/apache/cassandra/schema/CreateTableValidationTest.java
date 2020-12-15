@@ -67,8 +67,8 @@ public class CreateTableValidationTest extends CQLTester
         requireNetwork();
         int tableCountWarn = DatabaseDescriptor.tableCountWarnThreshold();
         int keyspaceCountWarn = DatabaseDescriptor.keyspaceCountWarnThreshold();
-        DatabaseDescriptor.setTableCountWarnThreshold(5);
-        DatabaseDescriptor.setKeyspaceCountWarnThreshold(1);
+        DatabaseDescriptor.setTableCountWarnThreshold(Schema.instance.getNumberOfTables());
+        DatabaseDescriptor.setKeyspaceCountWarnThreshold(Schema.instance.getKeyspaces().size());
 
         try (SimpleClient client = newSimpleClient(ProtocolVersion.CURRENT).connect(false))
         {
@@ -78,7 +78,7 @@ public class CreateTableValidationTest extends CQLTester
             assertTrue(resp.getWarnings().size() > 0);
             assertTrue(resp.getWarnings().get(0).contains("Having a large number of keyspaces will significantly"));
 
-            DatabaseDescriptor.setKeyspaceCountWarnThreshold(100);
+            DatabaseDescriptor.setKeyspaceCountWarnThreshold(Schema.instance.getKeyspaces().size() + 1);
             query = new QueryMessage(String.format(createKeyspace, 2), QueryOptions.DEFAULT);
             resp = client.execute(query);
             assertTrue(resp.getWarnings() == null || resp.getWarnings().isEmpty());
@@ -88,7 +88,7 @@ public class CreateTableValidationTest extends CQLTester
             assertTrue(resp.getWarnings().size() > 0);
             assertTrue(resp.getWarnings().get(0).contains("Having a large number of tables"));
 
-            DatabaseDescriptor.setTableCountWarnThreshold(20000);
+            DatabaseDescriptor.setTableCountWarnThreshold(Schema.instance.getNumberOfTables() + 1);
             query = new QueryMessage(String.format("CREATE TABLE %s.%s (id int primary key, x int)", KEYSPACE, "test2"), QueryOptions.DEFAULT);
             resp = client.execute(query);
             assertTrue(resp.getWarnings() == null || resp.getWarnings().isEmpty());
