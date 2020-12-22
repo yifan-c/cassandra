@@ -53,7 +53,7 @@ final class SingleTableUpdatesCollector implements UpdatesCollector
     private final RegularAndStaticColumns updatedColumns;
 
     /**
-     * The estimated number of updated row.
+     * The number of updated rows per key.
      */
     private final Map<ByteBuffer, Integer> perPartitionKeyCounts;
 

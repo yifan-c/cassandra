@@ -323,13 +323,6 @@ public class BatchStatement implements CQLStatement
         return collector.toMutations();
     }
 
-    private int updatedRows()
-    {
-        // Note: it's possible for 2 statements to actually apply to the same row, but that's just an estimation
-        // for sizing our PartitionUpdate backing array, so it's good enough.
-        return statements.size();
-    }
-
     /**
      * Checks batch size to ensure threshold is met. If not, a warning is logged.
      *

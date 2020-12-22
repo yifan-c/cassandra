@@ -46,7 +46,7 @@ final class BatchUpdatesCollector implements UpdatesCollector
     private final Map<TableId, RegularAndStaticColumns> updatedColumns;
 
     /**
-     * The estimated number of updated row.
+     * The number of updated rows per table and key.
      */
     private final Map<TableId, Map<ByteBuffer, Integer>> perPartitionKeyCounts;
 
