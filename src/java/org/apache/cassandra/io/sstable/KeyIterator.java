@@ -65,19 +65,30 @@ public class KeyIterator extends AbstractIterator<DecoratedKey> implements Close
         public boolean isEOF()
         {
             maybeInit();
-            return in.isEOF();
+            synchronized (this)
+            {
+                return in.isEOF();
+            }
         }
 
         public void close()
         {
-            if (in != null)
+            if (in == null)
+                return;
+
+            synchronized (this)
+            {
                 in.close();
+            }
         }
 
         public long getFilePointer()
         {
             maybeInit();
-            return in.getFilePointer();
+            synchronized (this)
+            {
+                return in.getFilePointer();
+            }
         }
 
         public long length()
