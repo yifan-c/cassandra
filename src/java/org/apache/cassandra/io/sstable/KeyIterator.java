@@ -19,6 +19,8 @@ package org.apache.cassandra.io.sstable;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.RowIndexEntry;
@@ -65,30 +67,19 @@ public class KeyIterator extends AbstractIterator<DecoratedKey> implements Close
         public boolean isEOF()
         {
             maybeInit();
-            synchronized (this)
-            {
-                return in.isEOF();
-            }
+            return in.isEOF();
         }
 
         public void close()
         {
-            if (in == null)
-                return;
-
-            synchronized (this)
-            {
+            if (in != null)
                 in.close();
-            }
         }
 
         public long getFilePointer()
         {
             maybeInit();
-            synchronized (this)
-            {
-                return in.getFilePointer();
-            }
+            return in.getFilePointer();
         }
 
         public long length()
@@ -101,6 +92,7 @@ public class KeyIterator extends AbstractIterator<DecoratedKey> implements Close
     private final Descriptor desc;
     private final In in;
     private final IPartitioner partitioner;
+    private final ReadWriteLock fileAccessLock;
 
     private long keyPosition;
 
@@ -109,10 +101,12 @@ public class KeyIterator extends AbstractIterator<DecoratedKey> implements Close
         this.desc = desc;
         in = new In(new File(desc.filenameFor(Component.PRIMARY_INDEX)));
         partitioner = metadata.partitioner;
+        fileAccessLock = new ReentrantReadWriteLock();
     }
 
     protected DecoratedKey computeNext()
     {
+        fileAccessLock.readLock().lock();
         try
         {
             if (in.isEOF())
@@ -127,16 +121,36 @@ public class KeyIterator extends AbstractIterator<DecoratedKey> implements Close
         {
             throw new RuntimeException(e);
         }
+        finally
+        {
+            fileAccessLock.readLock().unlock();
+        }
     }
 
     public void close()
     {
-        in.close();
+        fileAccessLock.writeLock().lock();
+        try
+        {
+            in.close();
+        }
+        finally
+        {
+            fileAccessLock.writeLock().unlock();
+        }
     }
 
     public long getBytesRead()
     {
-        return in.getFilePointer();
+        fileAccessLock.readLock().lock();
+        try
+        {
+            return in.getFilePointer();
+        }
+        finally
+        {
+            fileAccessLock.readLock().unlock();
+        }
     }
 
     public long getTotalBytes()
