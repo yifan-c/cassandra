@@ -66,7 +66,7 @@ public class ActiveCompactionsTest extends CQLTester
         getCurrentColumnFamilyStore().disableAutoCompaction();
         for (int i = 0; i < 5; i++)
         {
-            execute("INSERT INTO %s (pk, ck, a, b) VALUES ("+i+", 2, 3, 4)");
+            execute("INSERT INTO %s (pk, ck, a, b) VALUES (" + i + ", 2, 3, 4)");
             getCurrentColumnFamilyStore().forceBlockingFlush();
         }
 
@@ -110,7 +110,7 @@ public class ActiveCompactionsTest extends CQLTester
         getCurrentColumnFamilyStore().disableAutoCompaction();
         for (int i = 0; i < 5; i++)
         {
-            execute("INSERT INTO %s (pk, ck, a, b) VALUES ("+i+", 2, 3, 4)");
+            execute("INSERT INTO %s (pk, ck, a, b) VALUES (" + i + ", 2, 3, 4)");
             getCurrentColumnFamilyStore().forceBlockingFlush();
         }
 
@@ -133,7 +133,7 @@ public class ActiveCompactionsTest extends CQLTester
         getCurrentColumnFamilyStore().disableAutoCompaction();
         for (int i = 0; i < 5; i++)
         {
-            execute("INSERT INTO %s (pk, ck, a, b) VALUES ("+i+", 2, 3, 4)");
+            execute("INSERT INTO %s (pk, ck, a, b) VALUES (" + i + ", 2, 3, 4)");
             getCurrentColumnFamilyStore().forceBlockingFlush();
         }
         Set<SSTableReader> sstables = getCurrentColumnFamilyStore().getLiveSSTables();
@@ -158,7 +158,7 @@ public class ActiveCompactionsTest extends CQLTester
         getCurrentColumnFamilyStore().disableAutoCompaction();
         for (int i = 0; i < 5; i++)
         {
-            execute("INSERT INTO %s (k1, c1, val) VALUES ("+i+", 2, 3)");
+            execute("INSERT INTO %s (k1, c1, val) VALUES (" + i + ", 2, 3)");
             getCurrentColumnFamilyStore().forceBlockingFlush();
         }
         execute(String.format("CREATE MATERIALIZED VIEW %s.view1 AS SELECT k1, c1, val FROM %s.%s WHERE k1 IS NOT NULL AND c1 IS NOT NULL AND val IS NOT NULL PRIMARY KEY (val, k1, c1)", keyspace(), keyspace(), currentTable()));

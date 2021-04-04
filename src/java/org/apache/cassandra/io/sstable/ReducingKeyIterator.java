@@ -33,7 +33,7 @@ import org.apache.cassandra.utils.MergeIterator;
 public class ReducingKeyIterator implements CloseableIterator<DecoratedKey>
 {
     private final ArrayList<KeyIterator> iters;
-    private volatile IMergeIterator<DecoratedKey,DecoratedKey> mi;
+    private volatile IMergeIterator<DecoratedKey, DecoratedKey> mi;
 
     public ReducingKeyIterator(Collection<SSTableReader> sstables)
     {
@@ -51,7 +51,7 @@ public class ReducingKeyIterator implements CloseableIterator<DecoratedKey>
         {
             if (mi == null)
             {
-                mi = MergeIterator.get(iters, DecoratedKey.comparator, new MergeIterator.Reducer<DecoratedKey,DecoratedKey>()
+                mi = MergeIterator.get(iters, DecoratedKey.comparator, new MergeIterator.Reducer<DecoratedKey, DecoratedKey>()
                 {
                     DecoratedKey reduced = null;
 

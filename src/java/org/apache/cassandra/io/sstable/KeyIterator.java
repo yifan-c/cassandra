@@ -155,6 +155,8 @@ public class KeyIterator extends AbstractIterator<DecoratedKey> implements Close
 
     public long getTotalBytes()
     {
+        // length is final in the referenced object.
+        // no need to acquire the lock
         return in.length();
     }
 
