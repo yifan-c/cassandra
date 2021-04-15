@@ -1555,7 +1555,7 @@
       <fileset dir="${test.unit.src}" includes="**/${test.name}.java" />
       <fileset dir="${test.distributed.src}" includes="**/${test.name}.java" />
     </path>
-    <property name="test.file.list" refid="all-test-classes-path"/>
+    <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
     <testlist-compression test.file.list="${test.file.list}"/>
   </target>
 
@@ -1563,7 +1563,7 @@
     <path id="all-test-classes-path">
       <fileset dir="${test.unit.src}" includes="**/${test.name}.java" />
     </path>
-    <property name="test.file.list" refid="all-test-classes-path"/>
+    <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
     <testlist-cdc test.file.list="${test.file.list}"/>
   </target>
 
@@ -1571,7 +1571,7 @@
     <path id="all-test-classes-path">
       <fileset dir="${test.unit.src}" includes="**/${test.name}.java" />
     </path>
-    <property name="test.file.list" refid="all-test-classes-path"/>
+    <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
     <testlist-system-keyspace-directory test.file.list="${test.file.list}"/>
   </target>
 
@@ -1811,7 +1811,7 @@
     <path id="all-test-classes-path">
       <fileset dir="${test.unit.src}" includes="**/${test.name}.java" excludes="**/distributed/test/UpgradeTest*.java" />
     </path>
-    <property name="test.file.list" refid="all-test-classes-path"/>
+    <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
     <testlist test.file.list="${test.file.list}"/>
   </target>
 
@@ -1831,28 +1831,28 @@
     <path id="all-test-classes-path">
       <fileset dir="${test.dir}/${test.classlistprefix}" includesfile="${test.classlistfile}"/>
     </path>
-    <property name="test.file.list" refid="all-test-classes-path"/>
+    <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
     <testlist test.file.list="${test.file.list}"/>
   </target>
   <target name="testclasslist-compression" depends="build-test" description="Run tests given in file -Dtest.classlistfile (one-class-per-line, e.g. org/apache/cassandra/db/SomeTest.java)">
       <path id="all-test-classes-path">
           <fileset dir="${test.dir}/${test.classlistprefix}" includesfile="${test.classlistfile}"/>
       </path>
-      <property name="test.file.list" refid="all-test-classes-path"/>
+      <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
       <testlist-compression test.file.list="${test.file.list}"/>
   </target>
   <target name="testclasslist-cdc" depends="build-test" description="Run tests given in file -Dtest.classlistfile (one-class-per-line, e.g. org/apache/cassandra/db/SomeTest.java)">
       <path id="all-test-classes-path">
           <fileset dir="${test.dir}/${test.classlistprefix}" includesfile="${test.classlistfile}"/>
       </path>
-      <property name="test.file.list" refid="all-test-classes-path"/>
+      <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
       <testlist-cdc test.file.list="${test.file.list}"/>
   </target>
   <target name="testclasslist-system-keyspace-directory" depends="build-test" description="Run tests given in file -Dtest.classlistfile (one-class-per-line, e.g. org/apache/cassandra/db/SomeTest.java)">
       <path id="all-test-classes-path">
           <fileset dir="${test.dir}/${test.classlistprefix}" includesfile="${test.classlistfile}"/>
       </path>
-      <property name="test.file.list" refid="all-test-classes-path"/>
+      <pathconvert property="test.file.list" refid="all-test-classes-path" pathsep="&#10;" />
       <testlist-system-keyspace-directory test.file.list="${test.file.list}"/>
   </target>
 
