@@ -2378,6 +2378,11 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                         break;
                 }
             }
+            else
+            {
+                logger.debug("Ignoring application state {} from {} because it is not a member in token metadata",
+                             state, endpoint);
+            }
         }
     }
 
