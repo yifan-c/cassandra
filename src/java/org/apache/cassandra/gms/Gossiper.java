@@ -192,7 +192,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
         // Otherwise, upgradeInProgressPossible can be set to false wrongly.
         // If we don't know any epstate we don't know anything about the cluster.
         // If we only know about ourselves, we can assume that version is CURRENT_VERSION
-        if (!isEnabled() || isInShadowRound() || endpointStateMap.isEmpty() || endpointStateMap.keySet().equals(Collections.singleton(FBUtilities.getBroadcastAddressAndPort())))
+        if (!isEnabled() || endpointStateMap.isEmpty() || endpointStateMap.keySet().equals(Collections.singleton(FBUtilities.getBroadcastAddressAndPort())))
         {
             return new ExpiringMemoizingSupplier.NotMemoized<>(minVersion);
         }
