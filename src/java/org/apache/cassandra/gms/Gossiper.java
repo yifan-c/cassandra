@@ -181,9 +181,9 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     }
 
     // returns true when the node does not know the existence of other nodes.
-    private static boolean isLoneNode(Map<InetAddressAndPort, EndpointState> epStats)
+    private static boolean isLoneNode(Map<InetAddressAndPort, EndpointState> epStates)
     {
-        return epStats.isEmpty() || epStats.keySet().equals(Collections.singleton(FBUtilities.getBroadcastAddressAndPort()));
+        return epStates.isEmpty() || epStates.keySet().equals(Collections.singleton(FBUtilities.getBroadcastAddressAndPort()));
     }
 
     final Supplier<ExpiringMemoizingSupplier.ReturnValue<CassandraVersion>> upgradeFromVersionSupplier = () ->
