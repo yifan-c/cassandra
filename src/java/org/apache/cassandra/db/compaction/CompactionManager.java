@@ -1708,8 +1708,8 @@ public class CompactionManager implements CompactionManagerMBean
     @VisibleForTesting
     public static CompactionIterator getAntiCompactionIterator(List<ISSTableScanner> scanners, CompactionController controller, int nowInSec, UUID timeUUID, ActiveCompactionsTracker activeCompactions, BooleanSupplier isCancelled)
     {
-        return new CompactionIterator(OperationType.ANTICOMPACTION, scanners, controller, nowInSec, timeUUID, activeCompactions, null) {
-
+        return new CompactionIterator(OperationType.ANTICOMPACTION, scanners, controller, nowInSec, timeUUID, activeCompactions, null)
+        {
             public boolean isStopRequested()
             {
                 return super.isStopRequested() || isCancelled.getAsBoolean();

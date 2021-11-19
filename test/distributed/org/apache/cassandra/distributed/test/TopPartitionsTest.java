@@ -103,8 +103,8 @@ public class TopPartitionsTest extends TestBaseImpl
             for (int j = 0; j < i; j++)
                 CLUSTER.coordinator(1).execute("insert into " + table + " (id, ck, t) values (?,?,?)", ConsistencyLevel.ALL, i, j, i * j + 100);
 
-        repair();
-        CLUSTER.get(1).runOnInstance(() -> {
+        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        CLUSTER.forEach(inst -> inst.runOnInstance(() -> {
             // partitions 99 -> 90 are the largest, make sure they are in the map;
             Map<String, Long> sizes = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions();
             for (int i = 99; i >= 90; i--)
@@ -113,7 +113,27 @@ public class TopPartitionsTest extends TestBaseImpl
             Map<String, Long> tombstones = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopTombstonePartitions();
             assertEquals(10, tombstones.size());
             assertTrue(tombstones.values().stream().allMatch(l -> l == 0));
-        });
+        }));
+
+        // make sure incremental repair doesn't change anything;
+        CLUSTER.get(1).nodetool("repair", KEYSPACE);
+        CLUSTER.forEach(inst -> inst.runOnInstance(() -> {
+            Map<String, Long> sizes = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions();
+            for (int i = 99; i >= 90; i--)
+                assertTrue(sizes.containsKey(String.valueOf(i)));
+        }));
+
+        // make sure we can change the number of tracked partitions (and that -vd actually tracks);
+        CLUSTER.get(1).runOnInstance(() -> DatabaseDescriptor.setMaxTopSizePartitionCount(5));
+        CLUSTER.get(1).nodetool("repair", "-vd", KEYSPACE);
+        CLUSTER.get(1).runOnInstance(() -> assertEquals(5, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
+        CLUSTER.get(2).runOnInstance(() -> assertEquals(10, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
+
+        CLUSTER.get(1).runOnInstance(() -> DatabaseDescriptor.setMaxTopSizePartitionCount(35));
+        CLUSTER.get(1).nodetool("repair", "-vd", KEYSPACE);
+        CLUSTER.get(1).runOnInstance(() -> assertEquals(35, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
+        CLUSTER.get(2).runOnInstance(() -> assertEquals(10, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
+
     }
 
     @Test
@@ -270,5 +290,40 @@ public class TopPartitionsTest extends TestBaseImpl
             default:
                 throw new AssertionError("Unknown repair type: " + repair);
         }
+    }
+
+    @Test
+    public void basicRangeTombstonesTest() throws Throwable
+    {
+        String name = "tbl" + COUNTER.getAndIncrement();
+        String table = KEYSPACE + "." + name;
+        CLUSTER.schemaChange("create table " + table + " (id int, ck int, t int, primary key (id, ck)) with gc_grace_seconds = 1");
+        for (int i = 0; i < 100; i++)
+            for (int j = 0; j < i; j++)
+                CLUSTER.coordinator(1).execute("DELETE FROM " + table + " WHERE id = ? and ck >= ? and ck <= ?", ConsistencyLevel.ALL, i, j, j);
+        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        // tombstones not purgeable
+        CLUSTER.get(1).runOnInstance(() -> {
+            Map<String, Long> tombstones = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopTombstonePartitions();
+            // note that we count range tombstone markers - so the count will be double the number of deletions we did above
+            for (int i = 99; i >= 90; i--)
+                assertEquals(i * 2, (long)tombstones.get(String.valueOf(i)));
+        });
+        Thread.sleep(2000);
+        // count purgeable tombstones;
+        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        CLUSTER.get(1).runOnInstance(() -> {
+            Map<String, Long> tombstones = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopTombstonePartitions();
+            for (int i = 99; i >= 90; i--)
+                assertEquals(i * 2, (long)tombstones.get(String.valueOf(i)));
+        });
+
+        CLUSTER.get(1).forceCompact(KEYSPACE, name);
+        // all tombstones actually purged;
+        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        CLUSTER.get(1).runOnInstance(() -> {
+            Map<String, Long> tombstones = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopTombstonePartitions();
+            assertTrue(tombstones.values().stream().allMatch( l -> l == 0));
+        });
     }
 }

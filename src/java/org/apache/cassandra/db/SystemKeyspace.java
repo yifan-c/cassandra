@@ -34,6 +34,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
@@ -336,8 +337,8 @@ public final class SystemKeyspace
                 + "keyspace_name text,"
                 + "table_name text,"
                 + "top_type text,"
-                + "keys list<blob>,"
-                + "values list<bigint>,"
+                + "top frozen<list<tuple<text, bigint>>>,"
+                + "last_update timestamp,"
                 + "PRIMARY KEY (keyspace_name, table_name, top_type))")
                 .build();
 
@@ -1608,36 +1609,47 @@ public final class SystemKeyspace
         return r;
     }
 
-    public static void saveTopPartitions(String keyspaceName, String tableName, String topType, Collection<TopPartitionTracker.TopPartition> topPartitions)
+    public static void saveTopPartitions(TableMetadata metadata, String topType, Collection<TopPartitionTracker.TopPartition> topPartitions, long lastUpdate)
     {
-        String cql = String.format("INSERT INTO %s (keyspace_name, table_name, top_type, keys, values) values (?, ?, ?, ?, ?)", TopPartitions.toString());
-        List<ByteBuffer> keys = new ArrayList<>(topPartitions.size());
-        List<Long> values = new ArrayList<>(topPartitions.size());
+        String cql = String.format("INSERT INTO %s.%s (keyspace_name, table_name, top_type, top, last_update) values (?, ?, ?, ?, ?)", SchemaConstants.SYSTEM_KEYSPACE_NAME, TOP_PARTITIONS);
+        List<ByteBuffer> tupleList = new ArrayList<>(topPartitions.size());
         topPartitions.forEach(tp -> {
-            keys.add(tp.key.getKey());
-            values.add(tp.value);
+            String key = metadata.partitionKeyType.getString(tp.key.getKey());
+            tupleList.add(TupleType.buildValue(new ByteBuffer[] {UTF8Type.instance.decompose(key),
+                                                                 LongType.instance.decompose(tp.value)}));
         });
-        executeInternal(cql, keyspaceName, tableName, topType, keys, values);
+        executeInternal(cql, metadata.keyspace, metadata.name, topType, tupleList, Date.from(Instant.ofEpochMilli(lastUpdate)));
     }
 
-    public static List<Pair<ByteBuffer, Long>> getTopPartitions(String keyspaceName, String tableName, String topType)
+    public static TopPartitionTracker.StoredTopPartitions getTopPartitions(TableMetadata metadata, String topType)
     {
-        String cql = String.format("SELECT keys, values FROM %s WHERE keyspace_name = ? and table_name = ? and top_type = ?", TopPartitions.toString());
-        UntypedResultSet res = executeInternal(cql, keyspaceName, tableName, topType);
-        if (res == null || res.isEmpty())
-            return Collections.emptyList();
-        UntypedResultSet.Row row = res.one();
-        List<ByteBuffer> keys = row.getList("keys", BytesType.instance);
-        List<Long> values = row.getList("values", LongType.instance);
+        try
+        {
+            String cql = String.format("SELECT top, last_update FROM %s.%s WHERE keyspace_name = ? and table_name = ? and top_type = ?", SchemaConstants.SYSTEM_KEYSPACE_NAME, TOP_PARTITIONS);
+            UntypedResultSet res = executeInternal(cql, metadata.keyspace, metadata.name, topType);
+            if (res == null || res.isEmpty())
+                return TopPartitionTracker.StoredTopPartitions.EMPTY;
+            UntypedResultSet.Row row = res.one();
+            long lastUpdated = row.getLong("last_update");
+            List<ByteBuffer> top = row.getList("top", BytesType.instance);
+            if (top == null || top.isEmpty())
+                return TopPartitionTracker.StoredTopPartitions.EMPTY;
 
-        if (keys == null || values == null || keys.isEmpty() || values.isEmpty() || values.size() != keys.size())
-            return Collections.emptyList();
-
-        List<Pair<ByteBuffer, Long>> topPartitions = new ArrayList<>(keys.size());
-        for (int i = 0; i < keys.size(); i++)
-            topPartitions.add(Pair.create(keys.get(i), values.get(i)));
-
-        return topPartitions;
+            List<TopPartitionTracker.TopPartition> topPartitions = new ArrayList<>(top.size());
+            TupleType tupleType = new TupleType(Lists.newArrayList(UTF8Type.instance, LongType.instance));
+            for (ByteBuffer bb : top)
+            {
+                ByteBuffer[] components = tupleType.split(bb);
+                String keyStr = UTF8Type.instance.compose(components[0]);
+                long value = LongType.instance.compose(components[1]);
+                topPartitions.add(new TopPartitionTracker.TopPartition(metadata.partitioner.decorateKey(metadata.partitionKeyType.fromString(keyStr)), value));
+            }
+            return new TopPartitionTracker.StoredTopPartitions(topPartitions, lastUpdated);
+        }
+        catch (Exception e)
+        {
+            logger.warn("Could not load stored top {} partitions for {}.{}", topType, metadata.keyspace, metadata.name, e);
+            return TopPartitionTracker.StoredTopPartitions.EMPTY;
+        }
     }
-
 }

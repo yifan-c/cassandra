@@ -460,10 +460,10 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         repairManager = new CassandraTableRepairManager(this);
         sstableImporter = new SSTableImporter(this);
 
-        if (!SchemaConstants.isSystemKeyspace(keyspace.getName()))
-            topPartitions = new TopPartitionTracker(metadata().partitioner, keyspace.getName(), name);
-        else
+        if (SchemaConstants.isSystemKeyspace(keyspace.getName()))
             topPartitions = null;
+        else
+            topPartitions = new TopPartitionTracker(metadata());
     }
 
     public static String getTableMBeanName(String ks, String name, boolean isIndex)
@@ -578,6 +578,8 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         indexManager.dropAllIndexes();
 
         invalidateCaches();
+        if (topPartitions != null)
+            topPartitions.shutdown();
     }
 
     /**
@@ -3011,7 +3013,14 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         if (topPartitions == null)
             return Collections.emptyMap();
-        return topPartitions.getTopSizePartitionMap(metadata());
+        return topPartitions.getTopSizePartitionMap();
+    }
+
+    public Long getTopSizePartitionsLastUpdate()
+    {
+        if (topPartitions == null)
+            return null;
+        return topPartitions.topSizes().lastUpdate;
     }
 
     @Override
@@ -3019,6 +3028,13 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
     {
         if (topPartitions == null)
             return Collections.emptyMap();
-        return topPartitions.getTopTombstonePartitionMap(metadata());
+        return topPartitions.getTopTombstonePartitionMap();
+    }
+
+    public Long getTopTombstonePartitionsLastUpdate()
+    {
+        if (topPartitions == null)
+            return null;
+        return topPartitions.topTombstones().lastUpdate;
     }
 }

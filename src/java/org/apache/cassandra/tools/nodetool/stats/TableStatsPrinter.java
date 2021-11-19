@@ -135,6 +135,7 @@ public class TableStatsPrinter<T extends StatsHolder>
                 out.println(indent + "SSTables in correct location: " + table.isInCorrectLocation);
             if (table.topSizePartitions != null && !table.topSizePartitions.isEmpty())
             {
+                out.printf("\t\tTop partitions by size (last update: %s):%n", table.topSizePartitionsLastUpdate);
                 int maxWidth = Math.max(table.topSizePartitions.keySet().stream().map(String::length).max(Integer::compareTo).get() + 3, 5);
                 out.println(indent + "Top partitions by size:");
                 out.printf(indent + "  %-" + maxWidth + "s %s%n", "Key", "Size");
@@ -144,6 +145,7 @@ public class TableStatsPrinter<T extends StatsHolder>
 
             if (table.topTombstonePartitions != null && !table.topTombstonePartitions.isEmpty())
             {
+                out.printf("\t\tTop partitions by tombstone count (last update: %s):%n", table.topTombstonePartitionsLastUpdate);
                 int maxWidth = Math.max(table.topTombstonePartitions.keySet().stream().map(String::length).max(Integer::compareTo).get() + 3, 5);
                 out.println(indent + "Top partitions by tombstone count:");
                 out.printf(indent + "  %-" + maxWidth + "s %s%n", "Key", "Count");

@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.tools.nodetool.stats;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import com.google.common.collect.ArrayListMultimap;
@@ -361,7 +363,11 @@ public class TableStatsHolder implements StatsHolder
                 statsTable.droppedMutations = format((Long) probe.getColumnFamilyMetric(keyspaceName, tableName, "DroppedMutations"), humanReadable);
 
                 statsTable.topSizePartitions = format(table.getTopSizePartitions(), humanReadable);
+                if (table.getTopSizePartitionsLastUpdate() != null)
+                    statsTable.topSizePartitionsLastUpdate = millisToDateString(table.getTopSizePartitionsLastUpdate());
                 statsTable.topTombstonePartitions = table.getTopTombstonePartitions();
+                if (table.getTopTombstonePartitionsLastUpdate() != null)
+                    statsTable.topTombstonePartitionsLastUpdate = millisToDateString(table.getTopTombstonePartitionsLastUpdate());
 
                 statsKeyspace.tables.add(statsTable);
             }
@@ -380,6 +386,14 @@ public class TableStatsHolder implements StatsHolder
         for (Map.Entry<String, Long> entry : map.entrySet())
             retMap.put(entry.getKey(), format(entry.getValue(), humanReadable));
         return retMap;
+    }
+
+    private String millisToDateString(long millis)
+    {
+        TimeZone tz = TimeZone.getTimeZone("UTC");
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+        df.setTimeZone(tz);
+        return df.format(new Date(millis));
     }
 
     /**

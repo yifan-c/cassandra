@@ -74,4 +74,6 @@ public class StatsTable
     public Boolean isInCorrectLocation = null; // null: option not active
     public Map<String, String> topSizePartitions;
     public Map<String, Long> topTombstonePartitions;
+    public String topSizePartitionsLastUpdate;
+    public String topTombstonePartitionsLastUpdate;
 }

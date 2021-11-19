@@ -18,8 +18,8 @@
 
 package org.apache.cassandra.metrics;
 
-import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.TreeSet;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -41,12 +42,14 @@ import org.apache.cassandra.db.rows.RangeTombstoneMarker;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.db.rows.UnfilteredRowIterator;
 import org.apache.cassandra.db.transform.Transformation;
-import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.sstable.SSTable;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.utils.Pair;
+import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.utils.Clock;
+
+import static org.apache.cassandra.utils.Clock.Global.currentTimeMillis;
 
 /**
  * Tracks top partitions, currently by size and by tombstone count
@@ -72,42 +75,36 @@ public class TopPartitionTracker
 
     private final AtomicReference<TopHolder> topSizes = new AtomicReference<>();
     private final AtomicReference<TopHolder> topTombstones = new AtomicReference<>();
-    private final IPartitioner partitioner;
-    private final String keyspace;
-    private final String table;
+    private final TableMetadata metadata;
+    private final Future<?> scheduledSave;
 
-    public TopPartitionTracker(IPartitioner partitioner, String keyspace, String table)
+    public TopPartitionTracker(TableMetadata metadata)
     {
-        this.partitioner = partitioner;
-        this.keyspace = keyspace;
-        this.table = table;
-        startup();
+        this.metadata = metadata;
+        topSizes.set(new TopHolder(SystemKeyspace.getTopPartitions(metadata, SIZES),
+                                   DatabaseDescriptor.getMaxTopSizePartitionCount(),
+                                   DatabaseDescriptor.getMinTrackedPartitionSize()));
+        topTombstones.set(new TopHolder(SystemKeyspace.getTopPartitions(metadata, TOMBSTONES),
+                                        DatabaseDescriptor.getMaxTopTombstonePartitionCount(),
+                                        DatabaseDescriptor.getMinTrackedPartitionTombstoneCount()));
+        scheduledSave = ScheduledExecutors.optionalTasks.scheduleAtFixedRate(this::save, 60, 60, TimeUnit.MINUTES);
     }
 
-    private void startup()
+    public void shutdown()
     {
-        topSizes.set(new TopHolder(partitioner,
-                                   SystemKeyspace.getTopPartitions(keyspace, table, SIZES),
-                                   DatabaseDescriptor.getMaxTopSizePartitionCount(),
-                                   DatabaseDescriptor.getMinTrackedPartitionSize(),
-                                   null));
-        topTombstones.set(new TopHolder(partitioner,
-                                        SystemKeyspace.getTopPartitions(keyspace, table, TOMBSTONES),
-                                        DatabaseDescriptor.getMaxTopTombstonePartitionCount(),
-                                        DatabaseDescriptor.getMinTrackedPartitionTombstoneCount(),
-                                        null));
-        ScheduledExecutors.optionalTasks.scheduleAtFixedRate(this::save, 60, 60, TimeUnit.MINUTES);
+        scheduledSave.cancel(true);
     }
 
     @VisibleForTesting
     public void save()
     {
-        TopHolder topSize = topSizes.get();
-        if (!topSize.top.isEmpty())
-            SystemKeyspace.saveTopPartitions(keyspace, table, SIZES, topSize.top);
-        TopHolder topTombstones = this.topTombstones.get();
-        if (!topTombstones.top.isEmpty())
-            SystemKeyspace.saveTopPartitions(keyspace, table, TOMBSTONES, topTombstones.top);
+        TopHolder sizes = topSizes.get();
+        if (!sizes.top.isEmpty())
+            SystemKeyspace.saveTopPartitions(metadata, SIZES, sizes.top, sizes.lastUpdate);
+
+        TopHolder tombstones = topTombstones.get();
+        if (!tombstones.top.isEmpty())
+            SystemKeyspace.saveTopPartitions(metadata, TOMBSTONES, tombstones.top, tombstones.lastUpdate);
     }
 
     public void merge(Collector collector)
@@ -115,7 +112,7 @@ public class TopPartitionTracker
         while (true)
         {
             TopHolder cur = topSizes.get();
-            TopHolder newSizes = cur.merge(collector.sizes);
+            TopHolder newSizes = cur.merge(collector.sizes, StorageService.instance.getLocalReplicas(metadata.keyspace).ranges());
             if (topSizes.compareAndSet(cur, newSizes))
                 break;
         }
@@ -123,25 +120,26 @@ public class TopPartitionTracker
         while (true)
         {
             TopHolder cur = topTombstones.get();
-            TopHolder newTombstones = cur.merge(collector.tombstones);
+            TopHolder newTombstones = cur.merge(collector.tombstones, StorageService.instance.getLocalReplicas(metadata.keyspace).ranges());
             if (topTombstones.compareAndSet(cur, newTombstones))
                 break;
         }
     }
 
+    @Override
     public String toString()
     {
         return "TopPartitionTracker:\n" +
-                 "     topSizes:\n" + topSizes + '\n'
-               + "topTombstones:\n" + topTombstones + '\n';
+               "topSizes:\n" + topSizes.get() + '\n'
+               + "topTombstones:\n" + topTombstones.get() + '\n';
     }
 
-    public Map<String, Long> getTopTombstonePartitionMap(TableMetadata metadata)
+    public Map<String, Long> getTopTombstonePartitionMap()
     {
         return topTombstones.get().toMap(metadata);
     }
 
-    public Map<String, Long> getTopSizePartitionMap(TableMetadata metadata)
+    public Map<String, Long> getTopSizePartitionMap()
     {
         return topSizes.get().toMap(metadata);
     }
@@ -173,12 +171,12 @@ public class TopPartitionTracker
                                        ranges);
         }
 
-        public void trackTombstones(DecoratedKey key, long count)
+        public void trackTombstoneCount(DecoratedKey key, long count)
         {
             tombstones.track(key, count);
         }
 
-        public void trackSize(DecoratedKey key, long size)
+        public void trackPartitionSize(DecoratedKey key, long size)
         {
             sizes.track(key, size);
         }
@@ -196,29 +194,34 @@ public class TopPartitionTracker
         private final long minTrackedValue;
         private final Collection<Range<Token>> ranges;
         private long currentMinValue = Long.MAX_VALUE;
+        public final long lastUpdate;
 
         private TopHolder(int maxTopPartitionCount, long minTrackedValue, Collection<Range<Token>> ranges)
         {
-            this(maxTopPartitionCount, minTrackedValue, new TreeSet<>(), ranges);
+            this(maxTopPartitionCount, minTrackedValue, new TreeSet<>(), ranges, 0);
         }
 
-        private TopHolder(int maxTopPartitionCount, long minTrackedValue, NavigableSet<TopPartition> top, Collection<Range<Token>> ranges)
+        private TopHolder(int maxTopPartitionCount, long minTrackedValue, NavigableSet<TopPartition> top, Collection<Range<Token>> ranges, long lastUpdate)
         {
             this.maxTopPartitionCount = maxTopPartitionCount;
             this.minTrackedValue = minTrackedValue;
             this.top = top;
             this.ranges = ranges;
+            this.lastUpdate = lastUpdate;
         }
 
-        private TopHolder(IPartitioner partitioner, List<Pair<ByteBuffer, Long>> entries, int maxTopPartitionCount, long minTrackedValue, Collection<Range<Token>> ranges)
+        private TopHolder(StoredTopPartitions storedTopPartitions,
+                          int maxTopPartitionCount,
+                          long minTrackedValue)
         {
             this.maxTopPartitionCount = maxTopPartitionCount;
             this.minTrackedValue = minTrackedValue;
             top = new TreeSet<>();
-            this.ranges = ranges;
+            this.ranges = null;
+            this.lastUpdate = storedTopPartitions.lastUpdated;
 
-            for (Pair<ByteBuffer, Long> entry : entries)
-                track(new TopPartition(partitioner.decorateKey(entry.left), entry.right));
+            for (TopPartition topPartition : storedTopPartitions.topPartitions)
+                track(topPartition);
         }
 
         public void track(DecoratedKey key, long value)
@@ -246,20 +249,25 @@ public class TopPartitionTracker
          * range collected.
          *
          * This means that if a large partition is deleted it will disappear from the top partitions
+         *
+         * @param holder the newly collected holder - this will get copied and any existing token outside of the collected ranges will get added to the copy
+         * @param ownedRanges the ranges this node owns - any existing token outside of these ranges will get dropped
          */
-        public TopHolder merge(TopHolder holder)
+        public TopHolder merge(TopHolder holder, Collection<Range<Token>> ownedRanges)
         {
-            TopHolder mergedHolder = holder.copy();
+            TopHolder mergedHolder = holder.cloneForMerging(currentTimeMillis());
             for (TopPartition existingTop : top)
-                if (!Range.isInRanges(existingTop.key.getToken(), mergedHolder.ranges))
+            {
+                if (!Range.isInRanges(existingTop.key.getToken(), mergedHolder.ranges) &&
+                    (ownedRanges.isEmpty() || Range.isInRanges(existingTop.key.getToken(), ownedRanges))) // make sure we drop any tokens that we don't own anymore
                     mergedHolder.track(existingTop);
-
+            }
             return mergedHolder;
         }
 
-        private TopHolder copy()
+        private TopHolder cloneForMerging(long lastUpdate)
         {
-            return new TopHolder(maxTopPartitionCount, minTrackedValue, new TreeSet<>(top), ranges);
+            return new TopHolder(maxTopPartitionCount, minTrackedValue, new TreeSet<>(top), ranges, lastUpdate);
         }
 
         public String toString()
@@ -304,11 +312,13 @@ public class TopPartitionTracker
             this.value = value;
         }
 
+        @Override
         public int compareTo(TopPartition o)
         {
             return comparator.compare(this, o);
         }
 
+        @Override
         public String toString()
         {
             return "TopPartition{" +
@@ -370,7 +380,20 @@ public class TopPartitionTracker
         @Override
         public void onPartitionClose()
         {
-            collector.trackTombstones(key, tombstoneCount);
+            collector.trackTombstoneCount(key, tombstoneCount);
+        }
+    }
+
+    public static class StoredTopPartitions
+    {
+        public static StoredTopPartitions EMPTY = new StoredTopPartitions(Collections.emptyList(), 0);
+        public final List<TopPartition> topPartitions;
+        public final long lastUpdated;
+
+        public StoredTopPartitions(List<TopPartition> topPartitions, long lastUpdated)
+        {
+            this.topPartitions = topPartitions;
+            this.lastUpdated = lastUpdated;
         }
     }
 }

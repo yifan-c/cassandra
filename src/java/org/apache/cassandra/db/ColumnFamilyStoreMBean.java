@@ -259,6 +259,7 @@ public interface ColumnFamilyStoreMBean
     public List<String> getDataPaths() throws IOException;
 
     public Map<String, Long> getTopSizePartitions();
-
+    public Long getTopSizePartitionsLastUpdate();
     public Map<String, Long> getTopTombstonePartitions();
+    public Long getTopTombstonePartitionsLastUpdate();
 }
