@@ -103,7 +103,7 @@ public class TopPartitionsTest extends TestBaseImpl
             for (int j = 0; j < i; j++)
                 CLUSTER.coordinator(1).execute("insert into " + table + " (id, ck, t) values (?,?,?)", ConsistencyLevel.ALL, i, j, i * j + 100);
 
-        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        repair();
         CLUSTER.forEach(inst -> inst.runOnInstance(() -> {
             // partitions 99 -> 90 are the largest, make sure they are in the map;
             Map<String, Long> sizes = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions();
@@ -122,18 +122,6 @@ public class TopPartitionsTest extends TestBaseImpl
             for (int i = 99; i >= 90; i--)
                 assertTrue(sizes.containsKey(String.valueOf(i)));
         }));
-
-        // make sure we can change the number of tracked partitions (and that -vd actually tracks);
-        CLUSTER.get(1).runOnInstance(() -> DatabaseDescriptor.setMaxTopSizePartitionCount(5));
-        CLUSTER.get(1).nodetool("repair", "-vd", KEYSPACE);
-        CLUSTER.get(1).runOnInstance(() -> assertEquals(5, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
-        CLUSTER.get(2).runOnInstance(() -> assertEquals(10, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
-
-        CLUSTER.get(1).runOnInstance(() -> DatabaseDescriptor.setMaxTopSizePartitionCount(35));
-        CLUSTER.get(1).nodetool("repair", "-vd", KEYSPACE);
-        CLUSTER.get(1).runOnInstance(() -> assertEquals(35, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
-        CLUSTER.get(2).runOnInstance(() -> assertEquals(10, Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopSizePartitions().size()));
-
     }
 
     @Test
@@ -301,7 +289,7 @@ public class TopPartitionsTest extends TestBaseImpl
         for (int i = 0; i < 100; i++)
             for (int j = 0; j < i; j++)
                 CLUSTER.coordinator(1).execute("DELETE FROM " + table + " WHERE id = ? and ck >= ? and ck <= ?", ConsistencyLevel.ALL, i, j, j);
-        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        repair();
         // tombstones not purgeable
         CLUSTER.get(1).runOnInstance(() -> {
             Map<String, Long> tombstones = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopTombstonePartitions();
@@ -311,7 +299,7 @@ public class TopPartitionsTest extends TestBaseImpl
         });
         Thread.sleep(2000);
         // count purgeable tombstones;
-        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        repair();
         CLUSTER.get(1).runOnInstance(() -> {
             Map<String, Long> tombstones = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopTombstonePartitions();
             for (int i = 99; i >= 90; i--)
@@ -320,7 +308,7 @@ public class TopPartitionsTest extends TestBaseImpl
 
         CLUSTER.get(1).forceCompact(KEYSPACE, name);
         // all tombstones actually purged;
-        CLUSTER.get(1).nodetool("repair", "-full", KEYSPACE);
+        repair();
         CLUSTER.get(1).runOnInstance(() -> {
             Map<String, Long> tombstones = Keyspace.open(KEYSPACE).getColumnFamilyStore(name).getTopTombstonePartitions();
             assertTrue(tombstones.values().stream().allMatch( l -> l == 0));
