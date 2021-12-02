@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.metrics;
 
+import java.io.Closeable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -68,7 +69,7 @@ import static org.apache.cassandra.utils.Clock.Global.currentTimeMillis;
  * - top2: d, e
  *
  */
-public class TopPartitionTracker
+public class TopPartitionTracker implements Closeable
 {
     private final static String SIZES = "SIZES";
     private final static String TOMBSTONES = "TOMBSTONES";
@@ -77,6 +78,8 @@ public class TopPartitionTracker
     private final AtomicReference<TopHolder> topTombstones = new AtomicReference<>();
     private final TableMetadata metadata;
     private final Future<?> scheduledSave;
+    private long lastTombstoneSave = 0;
+    private long lastSizeSave = 0;
 
     public TopPartitionTracker(TableMetadata metadata)
     {
@@ -90,7 +93,7 @@ public class TopPartitionTracker
         scheduledSave = ScheduledExecutors.optionalTasks.scheduleAtFixedRate(this::save, 60, 60, TimeUnit.MINUTES);
     }
 
-    public void shutdown()
+    public void close()
     {
         scheduledSave.cancel(true);
     }
@@ -99,12 +102,18 @@ public class TopPartitionTracker
     public void save()
     {
         TopHolder sizes = topSizes.get();
-        if (!sizes.top.isEmpty())
+        if (!sizes.top.isEmpty() && sizes.lastUpdate > lastSizeSave)
+        {
             SystemKeyspace.saveTopPartitions(metadata, SIZES, sizes.top, sizes.lastUpdate);
+            lastSizeSave = sizes.lastUpdate;
+        }
 
         TopHolder tombstones = topTombstones.get();
-        if (!tombstones.top.isEmpty())
+        if (!tombstones.top.isEmpty() && tombstones.lastUpdate > lastTombstoneSave)
+        {
             SystemKeyspace.saveTopPartitions(metadata, TOMBSTONES, tombstones.top, tombstones.lastUpdate);
+            lastTombstoneSave = tombstones.lastUpdate;
+        }
     }
 
     public void merge(Collector collector)
@@ -130,8 +139,8 @@ public class TopPartitionTracker
     public String toString()
     {
         return "TopPartitionTracker:\n" +
-               "topSizes:\n" + topSizes.get() + '\n'
-               + "topTombstones:\n" + topTombstones.get() + '\n';
+               "topSizes:\n" + topSizes.get() + '\n' +
+               "topTombstones:\n" + topTombstones.get() + '\n';
     }
 
     public Map<String, Long> getTopTombstonePartitionMap()

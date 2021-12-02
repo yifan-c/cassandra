@@ -579,7 +579,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
 
         invalidateCaches();
         if (topPartitions != null)
-            topPartitions.shutdown();
+            topPartitions.close();
     }
 
     /**
@@ -3016,6 +3016,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         return topPartitions.getTopSizePartitionMap();
     }
 
+    @Override
     public Long getTopSizePartitionsLastUpdate()
     {
         if (topPartitions == null)
@@ -3031,6 +3032,7 @@ public class ColumnFamilyStore implements ColumnFamilyStoreMBean
         return topPartitions.getTopTombstonePartitionMap();
     }
 
+    @Override
     public Long getTopTombstonePartitionsLastUpdate()
     {
         if (topPartitions == null)
