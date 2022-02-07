@@ -1,4 +1,5 @@
 4.1
+ * Instance failed to start up due to NPE in StartupClusterConnectivityChecker (CASSANDRA-17347)
  * Standardize storage configuration parameters' names. Support unit suffixes. (CASSANDRA-15234)
  * Remove support for Windows (CASSANDRA-16956)
  * Runtime-configurable YAML option to prohibit USE statements (CASSANDRA-17318)
