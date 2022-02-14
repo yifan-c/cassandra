@@ -69,7 +69,7 @@ public class CommitLogReplayer implements CommitLogReadHandler
     private final Set<Keyspace> keyspacesReplayed;
     private final Queue<Future<Integer>> futures;
 
-    public final AtomicInteger replayedCount;
+    private final AtomicInteger replayedCount;
     private final Map<TableId, IntervalSet<CommitLogPosition>> cfPersisted;
     private final CommitLogPosition globalPosition;
 
@@ -84,9 +84,6 @@ public class CommitLogReplayer implements CommitLogReadHandler
 
     @VisibleForTesting
     protected CommitLogReader commitLogReader;
-
-    // The OpOrder used to order mutations before and after schema mutations
-    private final OpOrder writeOrder = new OpOrder();
 
     CommitLogReplayer(CommitLog commitLog,
                       CommitLogPosition globalPosition,
@@ -288,12 +285,7 @@ public class CommitLogReplayer implements CommitLogReadHandler
                     }
                 }
             };
-            return Stage.MUTATION.submit(() -> {
-                try (OpOrder.Group opOrder = commitLogReplayer.writeOrder.start())
-                {
-                    runnable.run();
-                }
-            }, serializedSize);
+            return Stage.MUTATION.submit(runnable, serializedSize);
         }
     }
 
@@ -461,7 +453,7 @@ public class CommitLogReplayer implements CommitLogReadHandler
         boolean isSchemaMutation = SchemaConstants.isSchemaKeyspace(m.getKeyspaceName());
 
         if (isSchemaMutation)
-            writeOrder.awaitNewBarrier();
+            FBUtilities.waitOnFutures(futures);
 
         futures.offer(mutationInitiator.initiateMutation(m,
                                                          desc.id,
