@@ -71,7 +71,9 @@ public class SSLFactoryTest
     private ServerEncryptionOptions addKeystoreOptions(ServerEncryptionOptions options)
     {
         return options.withKeyStore("test/conf/cassandra_ssl_test.keystore")
-                      .withKeyStorePassword("cassandra");
+                      .withKeyStorePassword("cassandra")
+                      .withOutboundKeystore("test/conf/cassandra_ssl_test.keystore")
+                      .withOutboundKeystorePassword("cassandra");
     }
 
     private ServerEncryptionOptions addPEMKeystoreOptions(ServerEncryptionOptions options)
@@ -81,6 +83,8 @@ public class SSLFactoryTest
         return options.withSslContextFactory(sslContextFactoryClass)
                       .withKeyStore("test/conf/cassandra_ssl_test.keystore.pem")
                       .withKeyStorePassword("cassandra")
+                      .withOutboundKeystore("test/conf/cassandra_ssl_test.keystore")
+                      .withOutboundKeystorePassword("cassandra")
                       .withTrustStore("test/conf/cassandra_ssl_test.truststore.pem");
     }
 
@@ -117,7 +121,29 @@ public class SSLFactoryTest
     }
 
     @Test
-    public void testPEMSslContextReload_HappyPath() throws IOException, InterruptedException
+    public void testServerSocketShouldUseKeystore() throws IOException
+    {
+        ServerEncryptionOptions options = addKeystoreOptions(encryptionOptions)
+        .withOutboundKeystore("dummyKeystore")
+        .withOutboundKeystorePassword("dummyPassword");
+
+        // Server socket type should create a keystore with keystore & keystore password
+        SSLFactory.createNettySslContext(options, true, ISslContextFactory.SocketType.SERVER);
+    }
+
+    @Test
+    public void testClientSocketShouldUseOutboundKeystore() throws IOException
+    {
+        ServerEncryptionOptions options = addKeystoreOptions(encryptionOptions)
+        .withKeyStore("dummyKeystore")
+        .withKeyStorePassword("dummyPassword");
+
+        // Client socket type should create a keystore with outbound Keystore & outbound password
+        SSLFactory.createNettySslContext(options, true, ISslContextFactory.SocketType.CLIENT);
+    }
+
+    @Test
+    public void testPEMSslContextReload_HappyPath() throws IOException
     {
         try
         {
@@ -223,8 +249,7 @@ public class SSLFactoryTest
     @Test
     public void getSslContext_ParamChanges() throws IOException
     {
-        EncryptionOptions options = addKeystoreOptions(encryptionOptions)
-                                    .withEnabled(true)
+        ServerEncryptionOptions options = addKeystoreOptions(encryptionOptions)
                                     .withCipherSuites("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256");
 
         SslContext ctx1 = SSLFactory.getOrCreateSslContext(options, true,

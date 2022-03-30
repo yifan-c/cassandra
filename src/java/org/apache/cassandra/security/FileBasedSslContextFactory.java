@@ -34,6 +34,7 @@ import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +62,8 @@ abstract public class FileBasedSslContextFactory extends AbstractSslContextFacto
 
     protected String keystore;
     protected String keystore_password;
+    protected String outboundKeystore;
+    protected String outbound_keystore_password;
     protected String truststore;
     protected String truststore_password;
 
@@ -68,6 +71,8 @@ abstract public class FileBasedSslContextFactory extends AbstractSslContextFacto
     {
         keystore = "conf/.keystore";
         keystore_password = "cassandra";
+        outboundKeystore = "conf/.keystore";
+        outbound_keystore_password = "cassandra";
         truststore = "conf/.truststore";
         truststore_password = "cassandra";
     }
@@ -79,6 +84,8 @@ abstract public class FileBasedSslContextFactory extends AbstractSslContextFacto
         keystore_password = getString("keystore_password");
         truststore = getString("truststore");
         truststore_password = getString("truststore_password");
+        outboundKeystore = StringUtils.defaultString(getString("outbound_keystore") , keystore);
+        outbound_keystore_password = StringUtils.defaultString(getString("outbound_keystore_password"), keystore_password);
     }
 
     @Override
@@ -93,6 +100,11 @@ abstract public class FileBasedSslContextFactory extends AbstractSslContextFacto
         return keystore != null && new File(keystore).exists();
     }
 
+    @Override
+    public boolean hasOutboundKeystore() {
+        return outboundKeystore!=null && new File(outboundKeystore).exists();
+    }
+
     private boolean hasTruststore()
     {
         return truststore != null && new File(truststore).exists();
@@ -102,14 +114,19 @@ abstract public class FileBasedSslContextFactory extends AbstractSslContextFacto
     public synchronized void initHotReloading()
     {
         boolean hasKeystore = hasKeystore();
+        boolean hasOutboundKeystore = hasKeystore();
         boolean hasTruststore = hasTruststore();
 
-        if (hasKeystore || hasTruststore)
+        if (hasKeystore || hasOutboundKeystore|| hasTruststore)
         {
             List<HotReloadableFile> fileList = new ArrayList<>();
             if (hasKeystore)
             {
                 fileList.add(new HotReloadableFile(keystore));
+            }
+            if (hasOutboundKeystore)
+            {
+                fileList.add(new HotReloadableFile(outboundKeystore));
             }
             if (hasTruststore)
             {
@@ -129,25 +146,13 @@ abstract public class FileBasedSslContextFactory extends AbstractSslContextFacto
     @Override
     protected KeyManagerFactory buildKeyManagerFactory() throws SSLException
     {
+        return getKeyManagerFactory(keystore, keystore_password);
+    }
 
-        try (InputStream ksf = Files.newInputStream(Paths.get(keystore)))
-        {
-            final String algorithm = this.algorithm == null ? KeyManagerFactory.getDefaultAlgorithm() : this.algorithm;
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance(algorithm);
-            KeyStore ks = KeyStore.getInstance(store_type);
-            ks.load(ksf, keystore_password.toCharArray());
-            if (!checkedExpiry)
-            {
-                checkExpiredCerts(ks);
-                checkedExpiry = true;
-            }
-            kmf.init(ks, keystore_password.toCharArray());
-            return kmf;
-        }
-        catch (Exception e)
-        {
-            throw new SSLException("failed to build key manager store for secure connections", e);
-        }
+    @Override
+    protected KeyManagerFactory buildOutboundKeyManagerFactory() throws SSLException
+    {
+        return getKeyManagerFactory(outboundKeystore, outbound_keystore_password);
     }
 
     /**
@@ -171,6 +176,28 @@ abstract public class FileBasedSslContextFactory extends AbstractSslContextFacto
         catch (Exception e)
         {
             throw new SSLException("failed to build trust manager store for secure connections", e);
+        }
+    }
+
+    private KeyManagerFactory getKeyManagerFactory(final String keystore, final String keystorePassword) throws SSLException
+    {
+        try (InputStream ksf = Files.newInputStream(Paths.get(keystore)))
+        {
+            final String algorithm = this.algorithm == null ? KeyManagerFactory.getDefaultAlgorithm() : this.algorithm;
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(algorithm);
+            KeyStore ks = KeyStore.getInstance(store_type);
+            ks.load(ksf, keystorePassword.toCharArray());
+            if (!checkedExpiry)
+            {
+                checkExpiredCerts(ks);
+                checkedExpiry = true;
+            }
+            kmf.init(ks, keystorePassword.toCharArray());
+            return kmf;
+        }
+        catch (Exception e)
+        {
+            throw new SSLException("failed to build key manager store for secure connections", e);
         }
     }
 

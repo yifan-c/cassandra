@@ -99,6 +99,8 @@ public interface ISslContextFactory
         return true;
     }
 
+    boolean hasOutboundKeystore();
+
     /**
      * Returns the prepared list of accepted protocols.
      *

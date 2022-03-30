@@ -62,6 +62,12 @@ public class DummySslContextFactoryImpl implements ISslContextFactory
     }
 
     @Override
+    public boolean hasOutboundKeystore()
+    {
+        return false;
+    }
+
+    @Override
     public List<String> getAcceptedProtocols()
     {
         return null;

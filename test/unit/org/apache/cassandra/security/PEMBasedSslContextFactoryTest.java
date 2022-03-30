@@ -216,6 +216,27 @@ public class PEMBasedSslContextFactoryTest
                                                            .withRequireClientAuth(false)
                                                            .withCipherSuites("TLS_RSA_WITH_AES_128_CBC_SHA")
                                                            .withSslContextFactory(sslContextFactory);
+        SslContext sslContext = SSLFactory.getOrCreateSslContext(options, true, ISslContextFactory.SocketType.SERVER);
+        Assert.assertNotNull(sslContext);
+        if (OpenSsl.isAvailable())
+            Assert.assertTrue(sslContext instanceof OpenSslContext);
+        else
+            Assert.assertTrue(sslContext instanceof SslContext);
+    }
+
+    @Test
+    public void getSslContextOpenSSLOutboundKeystore() throws IOException
+    {
+        ParameterizedClass sslContextFactory = new ParameterizedClass(PEMBasedSslContextFactory.class.getSimpleName()
+        , new HashMap<>());
+        EncryptionOptions.ServerEncryptionOptions options = new EncryptionOptions.ServerEncryptionOptions().withTrustStore("test/conf/cassandra_ssl_test.truststore.pem")
+                                                                                                           .withKeyStore("test/conf/cassandra_ssl_test.keystore.pem")
+                                                                                                           .withKeyStorePassword("cassandra")
+                                                                                                           .withOutboundKeystore("test/conf/cassandra_ssl_test.keystore.pem")
+                                                                                                           .withOutboundKeystorePassword("cassandra")
+                                                                                                           .withRequireClientAuth(false)
+                                                                                                           .withCipherSuites("TLS_RSA_WITH_AES_128_CBC_SHA")
+                                                                                                           .withSslContextFactory(sslContextFactory);
         SslContext sslContext = SSLFactory.getOrCreateSslContext(options, true, ISslContextFactory.SocketType.CLIENT);
         Assert.assertNotNull(sslContext);
         if (OpenSsl.isAvailable())
