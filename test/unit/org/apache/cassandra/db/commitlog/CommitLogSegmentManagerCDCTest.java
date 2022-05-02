@@ -143,9 +143,9 @@ public class CommitLogSegmentManagerCDCTest extends CQLTester
     @Test
     public void testCDCIndexFileWriteOnSync() throws IOException
     {
-        createTable("CREATE TABLE %s (idx int, data text, primary key(idx)) WITH cdc=true;");
+        createTable("CREATE TABLE %s (idx int, data_idx text, primary key(idx)) WITH cdc=true;");
         new RowUpdateBuilder(currentTableMetadata(), 0, 1)
-            .add("data", randomizeBuffer(DatabaseDescriptor.getCommitLogSegmentSize() / 3))
+            .add("data_idx", randomizeBuffer(DatabaseDescriptor.getCommitLogSegmentSize() / 3))
             .build().apply();
 
         CommitLog.instance.sync(true);
