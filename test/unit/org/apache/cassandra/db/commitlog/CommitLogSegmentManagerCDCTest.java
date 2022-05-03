@@ -167,9 +167,9 @@ public class CommitLogSegmentManagerCDCTest extends CQLTester
             Assert.assertTrue("index file size " + size, size > 0);
             throw new RuntimeException(String.format("Unable to read from file %s. Its size: %s. Content: %s", cdcIndexFile, size, new String(Files.readAllBytes(cdcIndexFile.toPath()))));
         }
-        Integer offset = Integer.parseInt(input);
-        Assert.assertEquals(String.format("%s sync tasks completed between the explicit sync (offset: %s) and reading index", CommitLog.instance.metrics.completedTasks.getValue() - writtenNow, syncOffset),
-                            syncOffset, (long)offset);
+        int offset = Integer.parseInt(input);
+        Assert.assertTrue(String.format("%s sync tasks completed between the explicit sync (offset: %s) and reading index", CommitLog.instance.metrics.completedTasks.getValue() - writtenNow, syncOffset),
+                            syncOffset <= offset);
         in.close();
     }
 

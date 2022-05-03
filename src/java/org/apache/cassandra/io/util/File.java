@@ -53,7 +53,7 @@ public class File implements Comparable<File>
 {
     private static FileSystem filesystem = FileSystems.getDefault();
 
-    public enum WriteMode { OVERWRITE, APPEND }
+    public enum WriteMode { OVERWRITE, APPEND, OVERWRITE_2 }
 
     public static String pathSeparator()
     {
@@ -729,6 +729,7 @@ public class File implements Comparable<File>
             default: throw new AssertionError();
             case APPEND: return PathUtils.newWriteAppendChannel(toPathForWrite());
             case OVERWRITE: return PathUtils.newWriteOverwriteChannel(toPathForWrite());
+            case OVERWRITE_2: return PathUtils.newReadWriteChannel(toPathForWrite());
         }
     }
 
