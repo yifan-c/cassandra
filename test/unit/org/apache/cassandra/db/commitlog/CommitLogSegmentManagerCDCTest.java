@@ -151,6 +151,7 @@ public class CommitLogSegmentManagerCDCTest extends CQLTester
         CommitLog.instance.sync(true);
         CommitLogSegment currentSegment = CommitLog.instance.segmentManager.allocatingFrom();
         int syncOffset = currentSegment.lastSyncedOffset;
+        long writtenNow = CommitLog.instance.metrics.completedTasks.getValue();
 
         // Confirm index file is written
         File cdcIndexFile = currentSegment.getCDCIndexFile();
@@ -159,8 +160,15 @@ public class CommitLogSegmentManagerCDCTest extends CQLTester
         // Read index value and confirm it's == end from last sync
         BufferedReader in = new BufferedReader(new FileReader(cdcIndexFile));
         String input = in.readLine();
+        if (input == null)
+        {
+            Assert.assertTrue(cdcIndexFile.exists());
+            long size = Files.size(cdcIndexFile.toPath());
+            Assert.assertTrue("index file size " + size, size > 0);
+        }
         Integer offset = Integer.parseInt(input);
-        Assert.assertEquals(syncOffset, (long)offset);
+        Assert.assertEquals(String.format("%s sync tasks completed between the explicit sync (offset: %s) and reading index", CommitLog.instance.metrics.completedTasks.getValue() - writtenNow, syncOffset),
+                            syncOffset, (long)offset);
         in.close();
     }
 
