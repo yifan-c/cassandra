@@ -99,6 +99,11 @@ public interface ISslContextFactory
         return true;
     }
 
+    /**
+     * Returns if this factory uses outbound keystore.
+     *
+     * @return {@code true} by default unless the implementation overrides this
+     */
     boolean hasOutboundKeystore();
 
     /**

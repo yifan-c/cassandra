@@ -106,6 +106,8 @@ public class EncryptionOptions
     {
         KEYSTORE("keystore"),
         KEYSTORE_PASSWORD("keystore_password"),
+        OUTBOUND_KEYSTORE("outbound_keystore"),
+        OUTBOUND_KEYSTORE_PASSWORD("outbound_keystore_password"),
         TRUSTSTORE("truststore"),
         TRUSTSTORE_PASSWORD("truststore_password"),
         CIPHER_SUITES("cipher_suites"),
@@ -116,9 +118,7 @@ public class EncryptionOptions
         REQUIRE_CLIENT_AUTH("require_client_auth"),
         REQUIRE_ENDPOINT_VERIFICATION("require_endpoint_verification"),
         ENABLED("enabled"),
-        OPTIONAL("optional"),
-        OUTBOUND_KEYSTORE("outbound_keystore"),
-        OUTBOUND_KEYSTORE_PASSWORD("outbound_keystore_password");
+        OPTIONAL("optional");
 
         final String keyName;
 
@@ -297,8 +297,7 @@ public class EncryptionOptions
         }
     }
 
-    protected void putSslContextFactoryParameter(Map<String,Object> existingParameters, ConfigKey configKey,
-                                               Object value)
+    protected static void putSslContextFactoryParameter(Map<String, Object> existingParameters, ConfigKey configKey, Object value)
     {
         if (value != null) {
             existingParameters.put(configKey.getKeyName(), value);
@@ -422,7 +421,8 @@ public class EncryptionOptions
         }
     }
 
-    public EncryptionOptions withSslContextFactory(ParameterizedClass sslContextFactoryClass) {
+    public EncryptionOptions withSslContextFactory(ParameterizedClass sslContextFactoryClass)
+    {
         return new EncryptionOptions(sslContextFactoryClass, keystore, keystore_password, truststore,
                                      truststore_password, cipher_suites,protocol, accepted_protocols, algorithm,
                                      store_type, require_client_auth, require_endpoint_verification,enabled,

@@ -83,7 +83,7 @@ public class SSLFactoryTest
         return options.withSslContextFactory(sslContextFactoryClass)
                       .withKeyStore("test/conf/cassandra_ssl_test.keystore.pem")
                       .withKeyStorePassword("cassandra")
-                      .withOutboundKeystore("test/conf/cassandra_ssl_test.keystore")
+                      .withOutboundKeystore("test/conf/cassandra_ssl_test.keystore.pem")
                       .withOutboundKeystorePassword("cassandra")
                       .withTrustStore("test/conf/cassandra_ssl_test.truststore.pem");
     }

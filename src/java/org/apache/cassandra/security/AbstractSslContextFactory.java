@@ -266,8 +266,9 @@ abstract public class AbstractSslContextFactory implements ISslContextFactory
     abstract protected TrustManagerFactory buildTrustManagerFactory() throws SSLException;
 
     /**
-     * Internode mTLS needs separate keystore for outbound connections.
-     * @return
+     * Create a {@code KeyManagerFactory} for outbound connections.
+     * It provides a seperate keystore for internode mTLS outbound connections.
+     * @return {@code KeyManagerFactory}
      * @throws SSLException
      */
     abstract protected KeyManagerFactory buildOutboundKeyManagerFactory() throws SSLException;

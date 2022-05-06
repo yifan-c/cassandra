@@ -103,42 +103,34 @@ public final class PEMBasedSslContextFactory extends FileBasedSslContextFactory
     {
     }
 
+    private void validatePasswords()
+    {
+        boolean shouldThrow = !keystoreContext.passwordMatchesIfPresent(keyPassword)
+                              || !outboundKeystoreContext.passwordMatchesIfPresent(outboundKeyPassword);
+        boolean isOutbound = !outboundKeystoreContext.passwordMatchesIfPresent(outboundKeyPassword);
+        String keyName = isOutbound ? "outbound_" : "";
+
+        if(shouldThrow) {
+            final String msg = String.format("'%skeystore_password' and '%skey_password' both configurations are given and the values do not match", keyName, keyName);
+            throw new IllegalArgumentException(msg);
+        }
+        else
+        {
+            logger.warn("'{}keystore_password' and '{}key_password' both are configured but since the values match it's " +
+                        "okay. Ideally you should only specify one of them.", keyName, keyName);
+        }
+    }
+
     public PEMBasedSslContextFactory(Map<String, Object> parameters)
     {
         super(parameters);
         pemEncodedKey = getString(ConfigKey.ENCODED_KEY.getKeyName());
-        keyPassword = getString(ConfigKey.KEY_PASSWORD.getKeyName());
-        if (StringUtils.isEmpty(keyPassword))
-        {
-            keyPassword = keystore_password;
-        }
-        else if (!StringUtils.isEmpty(keystore_password) && !keyPassword.equals(keystore_password))
-        {
-            throw new IllegalArgumentException("'keystore_password' and 'key_password' both configurations are given and the " +
-                                               "values do not match");
-        }
-        else
-        {
-            logger.warn("'keystore_password' and 'key_password' both are configured but since the values match it's " +
-                        "okay. Ideally you should only specify one of them.");
-        }
+        keyPassword = StringUtils.defaultString(getString(ConfigKey.KEY_PASSWORD.getKeyName()), keystoreContext.keystorePassword);
 
         pemEncodedOutboundKey = StringUtils.defaultString(getString(ConfigKey.OUTBOUND_KEY.getKeyName()), pemEncodedKey);
-        outboundKeyPassword = StringUtils.defaultString(getString(ConfigKey.OUTBOUND_KEY_PASSWORD.getKeyName()), keyPassword);
-        if (StringUtils.isEmpty(outboundKeyPassword))
-        {
-            outboundKeyPassword = outbound_keystore_password;
-        }
-        else if (!StringUtils.isEmpty(outboundKeystore) && !outboundKeyPassword.equals(outbound_keystore_password))
-        {
-            throw new IllegalArgumentException("'outbound_keystore_password' and 'outbound_key_password' both configurations are given and the " +
-                                               "values do not match");
-        }
-        else
-        {
-            logger.warn("'keystore_password' and 'key_password' both are configured but since the values match it's " +
-                        "okay. Ideally you should only specify one of them.");
-        }
+        outboundKeyPassword = StringUtils.defaultString(StringUtils.defaultString(getString(ConfigKey.OUTBOUND_KEY_PASSWORD.getKeyName()),
+                                                                                  outboundKeystoreContext.keystorePassword), keyPassword);
+        validatePasswords();
 
         if (!StringUtils.isEmpty(truststore_password))
         {
@@ -164,18 +156,22 @@ public final class PEMBasedSslContextFactory extends FileBasedSslContextFactory
     @Override
     public boolean hasKeystore()
     {
-        return maybeFileBasedPrivateKey ? keystoreFileExists() :
-               !StringUtils.isEmpty(pemEncodedKey);
+        return maybeFileBasedPrivateKey
+               ? keystoreContext.hasKeystore()
+               : !StringUtils.isEmpty(pemEncodedKey);
     }
 
     /**
-     * Checks if the keystore file exists.
+     * Decides if this factory has an outbound keystore defined - key material specified in files or inline to the configuration.
      *
-     * @return {@code true} if keystore file exists; {@code false} otherwise
+     * @return {@code true} if there is an outbound keystore defined; {@code false} otherwise
      */
-    private boolean keystoreFileExists()
+    @Override
+    public boolean hasOutboundKeystore()
     {
-        return keystore != null && new File(keystore).exists();
+        return maybeFileBasedOutboundPrivateKey
+               ? outboundKeystoreContext.hasKeystore()
+               : !StringUtils.isEmpty(pemEncodedKey);
     }
 
     /**
@@ -209,7 +205,11 @@ public final class PEMBasedSslContextFactory extends FileBasedSslContextFactory
         List<HotReloadableFile> fileList = new ArrayList<>();
         if (maybeFileBasedPrivateKey && hasKeystore())
         {
-            fileList.add(new HotReloadableFile(keystore));
+            fileList.add(new HotReloadableFile(keystoreContext.keystore));
+        }
+        if (maybeFileBasedOutboundPrivateKey && hasKeystore())
+        {
+            fileList.add(new HotReloadableFile(outboundKeystoreContext.keystore));
         }
         if (maybeFileBasedTrustedCertificates && hasTruststore())
         {
@@ -237,16 +237,16 @@ public final class PEMBasedSslContextFactory extends FileBasedSslContextFactory
             {
                 if (maybeFileBasedPrivateKey)
                 {
-                    pemEncodedKey = readPEMFile(keystore); // read PEM from the file
+                    pemEncodedKey = readPEMFile(keystoreContext.keystore); // read PEM from the file
                 }
 
                 KeyManagerFactory kmf = KeyManagerFactory.getInstance(
                 algorithm == null ? KeyManagerFactory.getDefaultAlgorithm() : algorithm);
                 KeyStore ks = buildKeyStore(pemEncodedKey, keyPassword);
-                if (!checkedExpiry)
+                if (!keystoreContext.checkedExpiry)
                 {
                     checkExpiredCerts(ks);
-                    checkedExpiry = true;
+                    keystoreContext.checkedExpiry = true;
                 }
                 kmf.init(ks, keyPassword != null ? keyPassword.toCharArray() : null);
                 return kmf;
@@ -270,18 +270,18 @@ public final class PEMBasedSslContextFactory extends FileBasedSslContextFactory
             {
                 if (maybeFileBasedOutboundPrivateKey)
                 {
-                    pemEncodedOutboundKey = readPEMFile(outboundKeystore); // read PEM from the file
+                    pemEncodedOutboundKey = readPEMFile(outboundKeystoreContext.keystore); // read PEM from the file
                 }
 
                 KeyManagerFactory kmf = KeyManagerFactory.getInstance(
                 algorithm == null ? KeyManagerFactory.getDefaultAlgorithm() : algorithm);
                 KeyStore ks = buildKeyStore(pemEncodedOutboundKey, outboundKeyPassword);
-                if (!checkedExpiry)
+                if (!outboundKeystoreContext.checkedExpiry)
                 {
                     checkExpiredCerts(ks);
-                    checkedExpiry = true;
+                    outboundKeystoreContext.checkedExpiry = true;
                 }
-                kmf.init(ks, outboundKeystore != null ? outboundKeyPassword.toCharArray() : null);
+                kmf.init(ks, outboundKeyPassword != null ? outboundKeyPassword.toCharArray() : null);
                 return kmf;
             }
             else
@@ -340,7 +340,7 @@ public final class PEMBasedSslContextFactory extends FileBasedSslContextFactory
      * Builds KeyStore object given the {@link #DEFAULT_TARGET_STORETYPE} out of the PEM formatted private key material.
      * It uses {@code cassandra-ssl-keystore} as the alias for the created key-entry.
      */
-    private KeyStore buildKeyStore(final String pemEncodedKey, final String keyPassword) throws GeneralSecurityException, IOException
+    private static KeyStore buildKeyStore(final String pemEncodedKey, final String keyPassword) throws GeneralSecurityException, IOException
     {
         char[] keyPasswordArray = keyPassword != null ? keyPassword.toCharArray() : null;
         PrivateKey privateKey = PEMReader.extractPrivateKey(pemEncodedKey, keyPassword);
@@ -385,9 +385,13 @@ public final class PEMBasedSslContextFactory extends FileBasedSslContextFactory
      */
     private void enforceSinglePrivateKeySource()
     {
-        if (keystoreFileExists() && !StringUtils.isEmpty(pemEncodedKey))
+        if (keystoreContext.hasKeystore() && !StringUtils.isEmpty(pemEncodedKey))
         {
             throw new IllegalArgumentException("Configuration must specify value for either keystore or private_key, " +
+                                               "not both for PEMBasedSSlContextFactory");
+        }
+        if (outboundKeystoreContext.hasKeystore() && !StringUtils.isEmpty(pemEncodedOutboundKey)) {
+            throw new IllegalArgumentException("Configuration must specify value for either outbound_keystore or outbound_private_key, " +
                                                "not both for PEMBasedSSlContextFactory");
         }
     }
