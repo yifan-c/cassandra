@@ -38,6 +38,7 @@ import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IIsolatedExecutor.SerializableRunnable;
 import org.apache.cassandra.distributed.shared.NetworkTopology;
 import org.apache.cassandra.exceptions.ConfigurationException;
+import org.apache.cassandra.exceptions.UnavailableException;
 import org.apache.cassandra.net.InboundMessageHandlers;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.OutboundConnections;
@@ -262,11 +263,22 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
 
     private void openConnections(Cluster cluster)
     {
-        cluster.coordinator(1).execute("CREATE KEYSPACE test_connections_from_1 " +
-                             "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};", ALL);
-
-        cluster.coordinator(2).execute("CREATE KEYSPACE test_connections_from_2 " +
-                             "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};", ALL);
+        try
+        {
+            cluster.coordinator(1).execute("SELECT * FROM system_distributed.repair_history LIMIT 1;", ALL);
+        }
+        catch (UnavailableException e)
+        {
+            // ignored
+        }
+        try
+        {
+            cluster.coordinator(2).execute("SELECT * FROM system_distributed.repair_history LIMIT 1;", ALL);
+        }
+        catch (UnavailableException e)
+        {
+            // ignored
+        }
     }
 
     private void verifyAuthenticationSucceeds(final Class authenticatorClass) throws IOException
