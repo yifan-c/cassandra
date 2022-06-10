@@ -24,8 +24,6 @@ import java.net.InetAddress;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.util.HashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -45,12 +43,10 @@ import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.net.OutboundConnections;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
-import static org.hamcrest.Matchers.containsString;
+import static org.apache.cassandra.distributed.api.ConsistencyLevel.ALL;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
 {
@@ -59,12 +55,9 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
     public void testInboundConnectionsAreRejectedWhenAuthFails() throws IOException, TimeoutException
     {
         Cluster.Builder builder = createCluster(RejectInboundConnections.class);
-
-        final ExecutorService executorService = Executors.newSingleThreadExecutor();
         try (Cluster cluster = builder.start())
         {
-            executorService.submit(() -> openConnections(cluster));
-
+            openConnections(cluster);
             /*
              * instance (1) should not connect to instance (2) as authentication fails;
              * instance (2) should not connect to instance (1) as authentication fails.
@@ -89,18 +82,15 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
             cluster.get(2).logs().watchFor("Unable to authenticate peer");
             cluster.get(2).runOnInstance(runnable);
         }
-        executorService.shutdown();
     }
 
     @Test
     public void testOutboundConnectionsAreRejectedWhenAuthFails() throws IOException, TimeoutException
     {
         Cluster.Builder builder = createCluster(RejectOutboundAuthenticator.class);
-
-        final ExecutorService executorService = Executors.newSingleThreadExecutor();
         try (Cluster cluster = builder.start())
         {
-            executorService.submit(() -> openConnections(cluster));
+            openConnections(cluster);
 
             /*
              * instance (1) should not connect to instance (2) as authentication fails;
@@ -127,7 +117,6 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
             cluster.get(2).logs().watchFor("authentication failed");
             cluster.get(2).runOnInstance(runnable);
         }
-        executorService.shutdown();
     }
 
     @Test
@@ -136,14 +125,7 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
         Cluster.Builder builder = createCluster(AllowFirstAndRejectOtherOutboundAuthenticator.class);
         try (Cluster cluster = builder.start())
         {
-            try
-            {
-                openConnections(cluster);
-            }
-            catch (RuntimeException ise)
-            {
-                assertThat(ise.getMessage(), containsString("agreement not reached"));
-            }
+            openConnections(cluster);
 
             // Verify that authentication is failed and Interrupt is called on outbound connections.
             cluster.get(1).logs().watchFor("authentication failed to");
@@ -158,10 +140,6 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
                 final AllowFirstAndRejectOtherOutboundAuthenticator authenticator = (AllowFirstAndRejectOtherOutboundAuthenticator) DatabaseDescriptor.getInternodeAuthenticator();
                 assertEquals(1, authenticator.successfulOutbound.get());
                 assertTrue(authenticator.failedOutbound.get() > 0);
-
-                // There should be no inbound connections as authentication fails.
-                InboundMessageHandlers inbound = getOnlyElement(MessagingService.instance().messageHandlers.values());
-                assertEquals(0, inbound.count());
 
                 // There should be no outbound connections as authentication fails.
                 OutboundConnections outbound = getOnlyElement(MessagingService.instance().channelManagers.values());
@@ -209,15 +187,7 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
 
         try (Cluster cluster = builder.start())
         {
-            try
-            {
-                openConnections(cluster);
-                fail("Instances should not be able to connect, much less complete a schema change.");
-            }
-            catch (RuntimeException ise)
-            {
-                assertThat(ise.getMessage(), containsString("agreement not reached"));
-            }
+            openConnections(cluster);
 
             /*
              * instance (1) won't connect to (2), since (2) won't have a TLS listener;
@@ -292,11 +262,11 @@ public final class InternodeEncryptionEnforcementTest extends TestBaseImpl
 
     private void openConnections(Cluster cluster)
     {
-        cluster.schemaChange("CREATE KEYSPACE test_connections_from_1 " +
-                             "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};", false, cluster.get(1));
+        cluster.coordinator(1).execute("CREATE KEYSPACE test_connections_from_1 " +
+                             "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};", ALL);
 
-        cluster.schemaChange("CREATE KEYSPACE test_connections_from_2 " +
-                             "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};", false, cluster.get(2));
+        cluster.coordinator(2).execute("CREATE KEYSPACE test_connections_from_2 " +
+                             "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};", ALL);
     }
 
     private void verifyAuthenticationSucceeds(final Class authenticatorClass) throws IOException
