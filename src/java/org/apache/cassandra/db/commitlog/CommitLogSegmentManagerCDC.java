@@ -20,6 +20,7 @@ package org.apache.cassandra.db.commitlog;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +36,7 @@ import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.commitlog.CommitLogSegment.CDCState;
 import org.apache.cassandra.exceptions.CDCWriteException;
+import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.utils.DirectorySizeCalculator;
 import org.apache.cassandra.utils.NoSpamLogger;
@@ -133,8 +135,9 @@ public class CommitLogSegmentManagerCDC extends AbstractCommitLogSegmentManager
 
         if (cdcSizeTracker.sizeInProgress + DatabaseDescriptor.getCommitLogSegmentSize() < cdcSizeTracker.allowableCDCBytes())
         {
-            segment.setCDCState(CDCState.PERMITTED);
-            if (!segment.getCDCFile().exists()) // skip creating hardlink if it exists already.
+            CDCState oldState = segment.setCDCState(CDCState.PERMITTED);
+
+            if (oldState == CDCState.FORBIDDEN)
             {
                 FileUtils.createHardLink(segment.logFile, segment.getCDCFile());
                 cdcSizeTracker.addSize(DatabaseDescriptor.getCommitLogSegmentSize());
