@@ -200,8 +200,8 @@ public class CommitLogSegmentManagerCDC extends AbstractCommitLogSegmentManager
         if (!DatabaseDescriptor.getCDCBlockWrites()
             || cdcSizeTracker.sizeInProgress.get() + DatabaseDescriptor.getCommitLogSegmentSize() < DatabaseDescriptor.getCDCTotalSpace())
         {
-            segment.setCDCState(CDCState.PERMITTED);
-            if (!segment.getCDCFile().exists()) // skip creating hardlink if it exists already.
+            CDCState oldState = segment.setCDCState(CDCState.PERMITTED);
+            if (oldState == CDCState.FORBIDDEN)
             {
                 FileUtils.createHardLink(segment.logFile, segment.getCDCFile());
                 cdcSizeTracker.addSize(DatabaseDescriptor.getCommitLogSegmentSize());
@@ -214,8 +214,10 @@ public class CommitLogSegmentManagerCDC extends AbstractCommitLogSegmentManager
         if (mutation.trackedByCDC() && segment.getCDCState() == CDCState.FORBIDDEN)
         {
             cdcSizeTracker.submitOverflowSizeRecalculation();
-            String logMsg = String.format("Rejecting mutation to keyspace %s. Free up space in %s by processing CDC logs.",
-                mutation.getKeyspaceName(), DatabaseDescriptor.getCDCLogLocation());
+            String logMsg = String.format("Rejecting mutation to keyspace %s. Free up space in %s by processing CDC logs. " +
+                                          "Total CDC bytes on disk is %s.",
+                                          mutation.getKeyspaceName(), DatabaseDescriptor.getCDCLogLocation(),
+                                          cdcSizeTracker.sizeInProgress.get());
             NoSpamLogger.log(logger,
                              NoSpamLogger.Level.WARN,
                              10,
