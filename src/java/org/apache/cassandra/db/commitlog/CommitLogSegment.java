@@ -687,6 +687,8 @@ public abstract class CommitLogSegment
     /**
      * Change the current cdcState on this CommitLogSegment. There are some restrictions on state transitions and this
      * method is idempotent.
+     *
+     * @return the old cdc state
      */
     public CDCState setCDCState(CDCState newState)
     {
