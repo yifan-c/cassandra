@@ -20,7 +20,7 @@ package org.apache.cassandra.service;
 
 import java.nio.ByteBuffer;
 import java.util.Collections;
-import java.util.List;
+import java.util.concurrent.Executors;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -45,7 +45,7 @@ public class StorageServiceDrainTest
     private static final String KEYSPACE = "keyspace";
     private static final String TABLE = "table";
     private static final String COLUMN = "column";
-    private static final int ROWS = 10;
+    private static final int ROWS = 1000;
 
     @Before
     public void before() throws Exception
@@ -86,7 +86,18 @@ public class StorageServiceDrainTest
                 .importNewSSTables(Collections.emptySet(), false, false, false, false, false, false, false)
                 .isEmpty());
 
-        StorageService.instance.drain();
+        Executors.newSingleThreadExecutor().execute(() -> {
+                try
+                {
+                    StorageService.instance.drain();
+                }
+                catch (final Exception exception)
+                {
+                    throw new RuntimeException(exception);
+                }});
+
+        while (!StorageService.instance.isDraining())
+            Thread.yield();
 
         assertThatThrownBy(() -> table
                 .importNewSSTables(Collections.emptySet(), false, false, false, false, false, false, false))
