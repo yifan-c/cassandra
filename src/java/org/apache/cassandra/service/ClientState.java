@@ -536,7 +536,7 @@ public class ClientState
         }
         else
         {
-            if (!user.hasAccessFromIp(remoteAddress))
+            if (remoteAddress != null && !user.hasAccessFromIp(remoteAddress))
                 throw new UnauthorizedException("You do not have access from this IP " + remoteAddress.getHostString());
         }
     }
