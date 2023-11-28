@@ -16,6 +16,7 @@
  * Remove deprecated code in Cassandra 1.x and 2.x (CASSANDRA-18959)
  * ClientRequestSize metrics should not treat CONTAINS restrictions as being equality-based (CASSANDRA-18896)
 Merged from 4.0:
+ * Support max SSTable size in sorted CQLSSTableWriter (CASSANDRA-18941)
  * Remove completed coordinator sessions (CASSANDRA-18903)
 
 
