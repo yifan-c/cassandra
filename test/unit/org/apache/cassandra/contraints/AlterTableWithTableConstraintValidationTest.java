@@ -63,6 +63,14 @@ public class AlterTableWithTableConstraintValidationTest extends CqlConstraintVa
     }
 
     @Test
+    public void testCreateTable() throws Throwable
+    {
+        createTable("CREATE TABLE %s (pk int PRIMARY KEY, length int, CONSTRAINT cons1 CHECK length < 100);");
+
+        createTable("CREATE TABLE %s (pk int PRIMARY KEY, length text, CONSTRAINT cons1 CHECK LENGTH(length) < 100);");
+    }
+
+    @Test
     public void testCreateTableAddConstraint() throws Throwable
     {
         String table = createTable("CREATE TABLE %s (pk int, ck1 int, ck2 int, v int, PRIMARY KEY ((pk),ck1, ck2)) WITH CLUSTERING ORDER BY (ck1 ASC);");
