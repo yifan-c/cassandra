@@ -1,3 +1,6 @@
+trunk?? (The current trunk is on 5.1)
+* Support ZSTD dictionary compression (CASSANDRA-17021)
+
 5.1
  * Add DDL Guardrail enabling administrators to disallow creation/modification of keyspaces with durable_writes = false (CASSANDRA-20913)
  * Optimize Counter, Meter and Histogram metrics using thread local counters (CASSANDRA-20250)
